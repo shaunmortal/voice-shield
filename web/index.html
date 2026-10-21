@@ -5,24 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Voice Shield</title>
 <style>
-  :root { --bg:#0b0f14; --fg:#e8eef5; --dim:#8a97a8; --ring:#2ec4ff; }
+  :root { --bg:#0b0f14; --fg:#e8eef5; --dim:#8a97a8; --card:#121820; --ring:#2ec4ff; }
   * { box-sizing:border-box; }
   body { margin:0; min-height:100vh; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, sans-serif;
-         display:flex; flex-direction:column; align-items:center; justify-content:center; gap:28px; padding:24px 16px; }
-  .echo { width:220px; height:220px; border-radius:50%; background:#11161d; position:relative;
-          box-shadow:0 0 0 10px var(--ring), 0 0 60px 10px var(--ring); transition:box-shadow .4s; }
+         display:flex; flex-direction:column; align-items:center; gap:22px; padding:28px 16px; }
+  .echo { width:180px; height:180px; border-radius:50%; background:#11161d; position:relative; flex:none;
+          box-shadow:0 0 0 9px var(--ring), 0 0 50px 8px var(--ring); transition:box-shadow .4s; }
   .echo::after { content:""; position:absolute; inset:38%; border-radius:50%; background:#1a212b; }
   body[data-level=alert] .echo { animation:pulse .8s infinite alternate; }
-  @keyframes pulse { to { box-shadow:0 0 0 14px var(--ring), 0 0 110px 30px var(--ring); } }
+  @keyframes pulse { to { box-shadow:0 0 0 13px var(--ring), 0 0 100px 28px var(--ring); } }
   body[data-level=listening] { --ring:#2ec4ff; } body[data-level=safe] { --ring:#2ee6a0; }
   body[data-level=suspicious] { --ring:#ffb020; } body[data-level=alert] { --ring:#ff3b4e; }
-  h1 { margin:0; font-size:28px; text-align:center; } p { margin:0; color:var(--dim); text-align:center; max-width:560px; }
+  h1 { margin:0; font-size:26px; text-align:center; } p { margin:0; color:var(--dim); text-align:center; max-width:560px; }
   .meter { width:min(420px, 100%); height:10px; background:#1a212b; border-radius:5px; overflow:hidden; }
   .meter i { display:block; height:100%; width:0; background:var(--ring); transition:width .4s; }
-  .row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
   button { background:#1a212b; color:var(--fg); border:1px solid #2a3442; border-radius:999px; padding:10px 18px; font:inherit; cursor:pointer; }
   button:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
+  button.ask { background:var(--ring); color:#0b0f14; border-color:transparent; font-weight:600; }
   small { color:var(--dim); }
+  .log { width:min(640px, 100%); background:var(--card); border:1px solid #1f2833; border-radius:14px; padding:14px 16px;
+         max-height:40vh; overflow:auto; font-size:14px; }
+  .log div { padding:6px 0; border-bottom:1px solid #1a222c; } .log div:last-child { border:0; }
+  .u { color:#9ad1ff; } .a { color:#e8eef5; } .t { color:var(--dim); font-family:ui-monospace, monospace; font-size:12px; }
 </style>
 </head>
 <body data-level="listening">
@@ -33,36 +38,83 @@
   <small id="meta">connecting…</small>
   <div class="row">
     <button id="voice">🔊 Enable Alexa voice</button>
+    <button class="ask" id="askStatus">"Alexa, is this call real?"</button>
+    <button class="ask" id="askVerify">"Alexa, ask Rohan if it's him"</button>
     <button id="reset">Call ended — reset</button>
   </div>
+  <div class="log" id="log" aria-live="polite"><div class="t">MCP client log (Streamable HTTP, spec 2025-11-25)</div></div>
 <script>
-  const TITLE = { listening:'Listening to the call…', safe:'Caller sounds human', suspicious:'Caller voice looks suspicious', alert:'⚠️ AI-cloned voice likely' };
+  // This page is a real MCP client: initialize -> notifications/initialized -> tools/list -> tools/call over POST /mcp,
+  // the same calls Alexa+ makes to an add-on. The light ring and spoken replies render the tool results.
+  const MCP = '/mcp';
+  const H = { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream', 'MCP-Protocol-Version': '2025-11-25' };
+  let id = 0, tools = [];
+  const logEl = document.getElementById('log');
+  const log = (cls, text) => { const d = document.createElement('div'); d.className = cls; d.textContent = text; logEl.appendChild(d); logEl.scrollTop = 1e9; };
+
+  async function rpc(method, params, notify = false) {
+    const body = { jsonrpc: '2.0', method, params: params || {} };
+    if (!notify) body.id = ++id;
+    const r = await fetch(MCP, { method: 'POST', headers: H, body: JSON.stringify(body) });
+    if (notify) return r.status;
+    const text = await r.text();
+    const json = r.headers.get('content-type')?.includes('text/event-stream')
+      ? text.split('\n').filter(l => l.startsWith('data:')).map(l => JSON.parse(l.slice(5))).pop()
+      : JSON.parse(text);
+    if (json.error) throw new Error(json.error.message);
+    return json.result;
+  }
+  async function connect() {
+    const init = await rpc('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'alexa-plus-simulator', version: '1.0' } });
+    await rpc('notifications/initialized', {}, true);
+    tools = (await rpc('tools/list')).tools;
+    log('t', `initialize ok: ${init.serverInfo.name} ${init.serverInfo.version} · protocol ${init.protocolVersion} · tools: ${tools.map(t => t.name).join(', ')}`);
+  }
+  const call = async (name, args) => (await rpc('tools/call', { name, arguments: args || {} })).structuredContent;
+
+  // ---- Alexa-style rendering
+  const TITLE = { listening: 'Listening to the call…', safe: 'Caller sounds human', suspicious: 'Caller voice looks suspicious', alert: '⚠️ AI-cloned voice likely' };
   const SPEAK = {
     suspicious: 'Saavdhaan. Is call ki awaaz mein kuch hissa machine jaisa lag raha hai. Abhi paise mat bhejiye.',
-    alert: 'Chetavani! Ye awaaz AI se banayi gayi lag rahi hai. Ye voice cloning scam ho sakta hai. Paise mat bhejiye, OTP mat batayiye. Phone kaatiye aur us insaan ko unke saved number par khud call kijiye.',
+    alert: 'Chetavani! Ye awaaz AI se banayi gayi lag rahi hai. Ye voice cloning scam ho sakta hai. Paise mat bhejiye, OTP mat batayiye. Main Rohan se khud poochh sakti hoon ki wo call kar rahe hain ya nahi.',
   };
   let voiceOn = false, last = 'listening';
-  const speak = (text) => {
+  const speak = (text, lang = 'hi-IN') => {
     if (!voiceOn) return;
     speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text); u.lang = 'hi-IN';
-    u.voice = speechSynthesis.getVoices().find(v => v.lang.startsWith('hi')) || null;
+    const u = new SpeechSynthesisUtterance(text); u.lang = lang;
+    u.voice = speechSynthesis.getVoices().find(v => v.lang.startsWith(lang.slice(0, 2))) || null;
     speechSynthesis.speak(u);
   };
-  async function tick() {
-    try {
-      const s = await (await fetch('/api/status')).json();
-      document.body.dataset.level = s.level;
-      title.textContent = TITLE[s.level]; say.textContent = s.say;
-      bar.style.width = Math.round(s.risk * 100) + '%';
-      meta.textContent = `risk ${Math.round(s.risk * 100)}% · ${s.speech_seconds}s of speech analysed · ${s.audio_live ? 'live audio' : 'no audio'}`;
-      if (s.level !== last && SPEAK[s.level]) speak(SPEAK[s.level]);
-      last = s.level;
-    } catch { meta.textContent = 'server offline'; }
+  function render(s) {
+    document.body.dataset.level = s.level;
+    title.textContent = TITLE[s.level]; say.textContent = s.say;
+    bar.style.width = Math.round(s.risk * 100) + '%';
+    meta.textContent = `risk ${Math.round(s.risk * 100)}% · ${s.speech_seconds}s of speech analysed · ${s.audio_live ? 'live audio' : 'no audio'}`;
+    if (s.level !== last && SPEAK[s.level]) speak(SPEAK[s.level]);
+    last = s.level;
   }
+  async function tick() {
+    try { render(await call('get_call_status')); }
+    catch (e) { meta.textContent = 'server offline: ' + e.message; }
+  }
+
   voice.onclick = () => { voiceOn = true; voice.textContent = '🔊 Alexa voice on'; speak('Voice Shield chalu hai.'); };
-  reset.onclick = () => fetch('/api/reset', { method:'POST' }).then(tick);
-  setInterval(tick, 700); tick();
+  askStatus.onclick = async () => {
+    log('u', 'User: "Alexa, is this call real?"');
+    const s = await call('get_call_status'); render(s);
+    log('a', 'Alexa: ' + s.say); speak(s.say, 'en-IN');
+  };
+  askVerify.onclick = async () => {
+    log('u', 'User: "Alexa, ask Rohan if it\'s really him."');
+    const wait = 'Theek hai, main Rohan ke phone par poochh rahi hoon. Jawab aane tak paise mat bhejiye.';
+    log('a', 'Alexa: ' + wait); speak(wait);
+    const v = await call('verify_with_family', { claimed_person: 'Rohan', reason: 'voice looks AI-generated and the caller is asking for money' });
+    log('a', 'Alexa: ' + v.say); speak(v.say, 'en-IN');
+  };
+  reset.onclick = async () => { await call('reset_call'); last = 'listening'; tick(); };
+
+  connect().then(() => { setInterval(tick, 1000); tick(); }).catch(e => log('t', 'connect failed: ' + e.message));
 </script>
 </body>
 </html>

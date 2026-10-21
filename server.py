@@ -17,6 +17,7 @@ from mcp.types import ToolAnnotations
 from starlette.responses import FileResponse, JSONResponse
 
 from engine import Shield
+import verify
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True)
 
@@ -72,6 +73,19 @@ def get_alert_history(limit: int = 5) -> list[Alert]:
             for e in reversed(events[-limit:])]
 
 
+class Verification(TypedDict):
+    answer: str  # yes | no | no_answer | unconfigured
+    say: str
+
+
+@mcp.tool(structured_output=True)
+def verify_with_family(claimed_person: str, reason: str = 'the caller is asking for money urgently') -> Verification:
+    """Ask the REAL family member, on their own phone, whether they are the one calling right now.
+    Use when the caller claims to be a relative and asks for money, an OTP, or secrecy, whatever the voice score says.
+    Waits up to 25 seconds for their answer."""
+    return verify.verify(claimed_person, reason)
+
+
 @mcp.tool()
 def reset_call() -> str:
     """Clear the live risk when a call ends, so the next call starts fresh. Alert history is kept."""
@@ -107,7 +121,7 @@ if __name__ == '__main__':
     # PUBLIC_HOST: the tunnel hostname Alexa+ reaches us on (e.g. abc.trycloudflare.com)
     hosts = ['127.0.0.1:*', 'localhost:*'] + [h for h in [os.environ.get('PUBLIC_HOST')] if h]
     app = mcp.streamable_http_app(
-        stateless_http=True,
+        stateless_http=True, json_response=True,  # plain JSON replies: Cloudflare quick tunnels do not pass SSE
         transport_security=TransportSecuritySettings(allowed_hosts=hosts, allowed_origins=[f'https://{h}' for h in hosts] + ['http://localhost:*', 'http://127.0.0.1:*']),
     )
     print(f'Voice Shield: page http://localhost:{args.port}/  MCP http://localhost:{args.port}/mcp  source={args.source}')

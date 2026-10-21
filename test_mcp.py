@@ -26,7 +26,7 @@ try:
     assert init['protocolVersion'] == '2025-11-25', init
     h = {**H, 'MCP-Protocol-Version': '2025-11-25'}
     tools = sorted(t['name'] for t in rpc('tools/list', id=2, headers=h)['tools'])
-    assert tools == ['get_alert_history', 'get_call_status', 'reset_call'], tools
+    assert tools == ['get_alert_history', 'get_call_status', 'reset_call', 'verify_with_family'], tools
     levels = []
     for i in range(20):
         levels.append(rpc('tools/call', {'name': 'get_call_status', 'arguments': {}}, id=10 + i, headers=h)['structuredContent']['level'])
