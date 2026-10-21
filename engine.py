@@ -69,8 +69,16 @@ class Detector:
         local = snapshot_download(MODEL, local_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', 'df_arena_500m'))
         self.pipe = pipeline('antispoofing', model=local, trust_remote_code=True, device=device)
 
+    # Softmax saturates (every clone = 1.000), so score on the logit margin and calibrate it ourselves.
+    # ponytail: shift/scale set by hand from eval.py on our own voice; refit when the real-call set exists.
+    CAL_SHIFT, CAL_SCALE = 4.0, 2.0
+
+    def margin(self, audio):
+        l = self.pipe(audio)['logits'][0]
+        return float(l[0] - l[1])  # spoof logit - bonafide logit
+
     def p_fake(self, audio):
-        return float(self.pipe(audio)['all_scores']['spoof'])
+        return float(1 / (1 + np.exp(-(self.margin(audio) - self.CAL_SHIFT) / self.CAL_SCALE)))
 
     def score(self, short, long):
         if dbfs(short) < SPEECH_DBFS:

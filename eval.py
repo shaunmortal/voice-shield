@@ -58,9 +58,9 @@ def windows(path):
     if a.ndim > 1:
         a = a.mean(1)
     assert sr == 16000, path
-    if len(a) <= WIN:
-        return [a]
-    return [a[i:i + WIN] for i in range(0, len(a) - WIN + 1, WIN // 2)]
+    from engine import dbfs, SPEECH_DBFS
+    ws = [a] if len(a) <= WIN else [a[i:i + WIN] for i in range(0, len(a) - WIN + 1, WIN // 2)]
+    return [w for w in ws if dbfs(w) >= SPEECH_DBFS]  # same silence gate as the live engine
 
 
 def eer(scores, labels):
