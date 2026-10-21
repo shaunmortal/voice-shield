@@ -20,9 +20,11 @@ HOP_S = 1.0          # run Stage 1 every second
 WIN_S = 2.0          # on the last 2 s of audio
 CONFIRM_WIN_S = 4.0  # Stage 2 looks at a longer window
 SPEECH_DBFS = -45    # below this RMS the window is treated as silence
-# Stage 1: NII AntiDeepfake Wav2Vec2-Small (95M, ~75 ms / 4 s on M1 MPS, CC BY-NC-SA 4.0 weights)
-# Stage 2: Speech-Arena DF_Arena_500M (~230 ms, non-commercial), only run when Stage 1 is suspicious
-STAGE2 = 'Speech-Arena-2025/DF_Arena_500M_V_1'
+# Speech-Arena DF_Arena_500M (XLS-R + conformer head, ~230 ms per window on M1 MPS, non-commercial weights).
+# Stage 1 scores the last 2 s every second; Stage 2 re-scores the last 4 s only when Stage 1 is suspicious.
+# NII AntiDeepfake-Small (antideepfake.py) was tried first: 75 ms, but it missed F5-TTS clones of our own
+# voice (p_fake 0.02-0.47) while DF_Arena caught all of them at 1.0, so it is kept only for eval.py.
+MODEL = 'Speech-Arena-2025/DF_Arena_500M_V_1'
 
 
 def pcm_stream(source):
@@ -64,18 +66,19 @@ class Detector:
     def __init__(self, device='mps'):
         from huggingface_hub import snapshot_download
         from transformers import pipeline
-        from antideepfake import AntiDeepfake
-        self.fast = AntiDeepfake(device)
-        local = snapshot_download(STAGE2, local_dir=os.path.join(os.path.dirname(__file__), 'models', 'df_arena_500m'))
-        self.confirm = pipeline('antispoofing', model=local, trust_remote_code=True, device=device)
+        local = snapshot_download(MODEL, local_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', 'df_arena_500m'))
+        self.pipe = pipeline('antispoofing', model=local, trust_remote_code=True, device=device)
+
+    def p_fake(self, audio):
+        return float(self.pipe(audio)['all_scores']['spoof'])
 
     def score(self, short, long):
         if dbfs(short) < SPEECH_DBFS:
             return None, None
-        s1 = self.fast.p_fake(short)
+        s1 = self.p_fake(short)
         if s1 < 0.5:
             return s1, None
-        s2 = self.confirm(long)['all_scores']['spoof']
+        s2 = self.p_fake(long)
         return (s1 + s2) / 2, s2
 
 
