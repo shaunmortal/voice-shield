@@ -20,8 +20,9 @@ HOP_S = 1.0          # run Stage 1 every second
 WIN_S = 2.0          # on the last 2 s of audio
 CONFIRM_WIN_S = 4.0  # Stage 2 looks at a longer window
 SPEECH_DBFS = -45    # below this RMS the window is treated as silence
-STAGE1 = 'Om-Parab/distilhubert-finetuned-audio-deepfake-in-the-wild'
-STAGE2 = 'Gustking/wav2vec2-large-xlsr-deepfake-audio-classification'
+# Stage 1: NII AntiDeepfake Wav2Vec2-Small (95M, ~75 ms / 4 s on M1 MPS, CC BY-NC-SA 4.0 weights)
+# Stage 2: Speech-Arena DF_Arena_500M (~230 ms, non-commercial), only run when Stage 1 is suspicious
+STAGE2 = 'Speech-Arena-2025/DF_Arena_500M_V_1'
 
 
 def pcm_stream(source):
@@ -61,22 +62,20 @@ class Detector:
     """Two-stage anti-spoof. Returns P(synthetic) for a window, or None for silence."""
 
     def __init__(self, device='mps'):
+        from huggingface_hub import snapshot_download
         from transformers import pipeline
-        self.fast = pipeline('audio-classification', model=STAGE1, device=device)
-        self.confirm = pipeline('audio-classification', model=STAGE2, device=device)
-
-    @staticmethod
-    def _p_fake(clf, audio):
-        out = {o['label'].lower(): o['score'] for o in clf({'raw': audio, 'sampling_rate': SR})}
-        return out.get('spoof', out.get('fake', 0.0))
+        from antideepfake import AntiDeepfake
+        self.fast = AntiDeepfake(device)
+        local = snapshot_download(STAGE2, local_dir=os.path.join(os.path.dirname(__file__), 'models', 'df_arena_500m'))
+        self.confirm = pipeline('antispoofing', model=local, trust_remote_code=True, device=device)
 
     def score(self, short, long):
         if dbfs(short) < SPEECH_DBFS:
             return None, None
-        s1 = self._p_fake(self.fast, short)
+        s1 = self.fast.p_fake(short)
         if s1 < 0.5:
             return s1, None
-        s2 = self._p_fake(self.confirm, long)
+        s2 = self.confirm(long)['all_scores']['spoof']
         return (s1 + s2) / 2, s2
 
 

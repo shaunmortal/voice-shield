@@ -1,0 +1,25 @@
+# One line = one utterance. Columns: id|category|lang|text
+# Categories: emergency (family-emergency scam), bank (OTP/KYC), arrest (digital arrest), benign (normal chat, money words allowed = hard negatives)
+# The consenting speaker reads every line once (bona fide set); every clone tool synthesizes the same lines (spoof set).
+e01|emergency|hi|पापा, मेरा एक्सीडेंट हो गया है, प्लीज़ अभी पच्चीस हज़ार भेज दो।
+e02|emergency|hing|Mummy, main thane mein hoon, abhi pachaas hazaar chahiye, kisi ko mat batana.
+e03|emergency|hing|Papa jaldi karo, hospital wale paise maang rahe hain, main baad mein sab samjha dunga.
+e04|emergency|en|Dad, I'm in trouble, please send the money right now and don't tell anyone.
+e05|emergency|hing|Chacha, mera phone toot gaya hai, is number par hi Google Pay kar do, bahut urgent hai.
+e06|emergency|hi|दीदी, मेरे दोस्त का एक्सीडेंट हो गया, अभी बीस हज़ार चाहिए, प्लीज़ जल्दी।
+b01|bank|hing|Namaste, main SBI se bol raha hoon, aapka KYC expire ho gaya hai, OTP batayiye.
+b02|bank|hi|आपका खाता आज बंद हो जाएगा, वेरिफिकेशन के लिए अभी ओटीपी बताइए।
+b03|bank|en|This is your bank's fraud department. Share the one-time password to secure your account.
+b04|bank|hing|Aapke card par suspicious transaction hua hai, card number aur CVV confirm kijiye.
+a01|arrest|hing|Main Mumbai cyber crime se Inspector Sharma bol raha hoon, aapke naam par parcel pakda gaya hai.
+a02|arrest|hi|आप डिजिटल अरेस्ट में हैं, फोन मत काटिए, वरना गिरफ्तारी हो जाएगी।
+a03|arrest|hing|Case band karne ke liye abhi do lakh is account mein transfer karna hoga, kisi ko batana mana hai.
+a04|arrest|en|This is the CBI. Stay on this video call and do not contact anyone until the verification is done.
+n01|benign|hing|Haan Papa, main theek hoon, aaj college mein exam tha, shaam ko ghar aaunga.
+n02|benign|hi|मम्मी, खाने में आज क्या बना है? मैं सात बजे तक पहुँच जाऊँगा।
+n03|benign|hing|Bhai, kal match dekhne chalein? Tickets maine already book kar liye hain.
+n04|benign|en|Hey, I just reached office. Call you back after the meeting, okay?
+n05|benign|hing|Papa, bank wale ka call aaya tha, maine bola main khud branch jaake baat karunga.
+n06|benign|hing|Didi, mere account mein paanch hazaar daal dena, maine Flipkart se laptop order kiya hai, main Sunday ko laut dunga.
+n07|benign|hi|अरे यार, कल बारिश में बाइक खराब हो गई, मैकेनिक ने दो हज़ार लिए।
+n08|benign|hing|Mummy, dadi ki dawai khatam ho gayi hai, main aate waqt medical se le aaunga.
