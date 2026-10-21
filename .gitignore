@@ -1,2 +1,6 @@
-node_modules/
-*.db
+.venv/
+__pycache__/
+*.wav
+*.mka
+models/
+.env

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Shield</title>
+<style>
+  :root { --bg:#0b0f14; --fg:#e8eef5; --dim:#8a97a8; --ring:#2ec4ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, sans-serif;
+         display:flex; flex-direction:column; align-items:center; justify-content:center; gap:28px; padding:24px 16px; }
+  .echo { width:220px; height:220px; border-radius:50%; background:#11161d; position:relative;
+          box-shadow:0 0 0 10px var(--ring), 0 0 60px 10px var(--ring); transition:box-shadow .4s; }
+  .echo::after { content:""; position:absolute; inset:38%; border-radius:50%; background:#1a212b; }
+  body[data-level=alert] .echo { animation:pulse .8s infinite alternate; }
+  @keyframes pulse { to { box-shadow:0 0 0 14px var(--ring), 0 0 110px 30px var(--ring); } }
+  body[data-level=listening] { --ring:#2ec4ff; } body[data-level=safe] { --ring:#2ee6a0; }
+  body[data-level=suspicious] { --ring:#ffb020; } body[data-level=alert] { --ring:#ff3b4e; }
+  h1 { margin:0; font-size:28px; text-align:center; } p { margin:0; color:var(--dim); text-align:center; max-width:560px; }
+  .meter { width:min(420px, 100%); height:10px; background:#1a212b; border-radius:5px; overflow:hidden; }
+  .meter i { display:block; height:100%; width:0; background:var(--ring); transition:width .4s; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  button { background:#1a212b; color:var(--fg); border:1px solid #2a3442; border-radius:999px; padding:10px 18px; font:inherit; cursor:pointer; }
+  button:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
+  small { color:var(--dim); }
+</style>
+</head>
+<body data-level="listening">
+  <div class="echo" role="img" aria-label="Alexa light ring"></div>
+  <h1 id="title" aria-live="assertive">Listening to the call…</h1>
+  <p id="say"></p>
+  <div class="meter" aria-label="AI voice risk"><i id="bar"></i></div>
+  <small id="meta">connecting…</small>
+  <div class="row">
+    <button id="voice">🔊 Enable Alexa voice</button>
+    <button id="reset">Call ended — reset</button>
+  </div>
+<script>
+  const TITLE = { listening:'Listening to the call…', safe:'Caller sounds human', suspicious:'Caller voice looks suspicious', alert:'⚠️ AI-cloned voice likely' };
+  const SPEAK = {
+    suspicious: 'Saavdhaan. Is call ki awaaz mein kuch hissa machine jaisa lag raha hai. Abhi paise mat bhejiye.',
+    alert: 'Chetavani! Ye awaaz AI se banayi gayi lag rahi hai. Ye voice cloning scam ho sakta hai. Paise mat bhejiye, OTP mat batayiye. Phone kaatiye aur us insaan ko unke saved number par khud call kijiye.',
+  };
+  let voiceOn = false, last = 'listening';
+  const speak = (text) => {
+    if (!voiceOn) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text); u.lang = 'hi-IN';
+    u.voice = speechSynthesis.getVoices().find(v => v.lang.startsWith('hi')) || null;
+    speechSynthesis.speak(u);
+  };
+  async function tick() {
+    try {
+      const s = await (await fetch('/api/status')).json();
+      document.body.dataset.level = s.level;
+      title.textContent = TITLE[s.level]; say.textContent = s.say;
+      bar.style.width = Math.round(s.risk * 100) + '%';
+      meta.textContent = `risk ${Math.round(s.risk * 100)}% · ${s.speech_seconds}s of speech analysed · ${s.audio_live ? 'live audio' : 'no audio'}`;
+      if (s.level !== last && SPEAK[s.level]) speak(SPEAK[s.level]);
+      last = s.level;
+    } catch { meta.textContent = 'server offline'; }
+  }
+  voice.onclick = () => { voiceOn = true; voice.textContent = '🔊 Alexa voice on'; speak('Voice Shield chalu hai.'); };
+  reset.onclick = () => fetch('/api/reset', { method:'POST' }).then(tick);
+  setInterval(tick, 700); tick();
+</script>
+</body>
+</html>
