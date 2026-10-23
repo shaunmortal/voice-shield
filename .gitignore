@@ -16,3 +16,4 @@ video/*.png
 video/*.json
 video/*.txt
 video/*.log
+*.opus

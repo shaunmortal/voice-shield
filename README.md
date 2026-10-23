@@ -2,6 +2,8 @@
 
 **Alexa+ track · Amazon Developer Hackathon 2026 · self-hosted MCP server (spec 2025-11-25, Streamable HTTP)**
 
+**Demo video (2:53):** https://youtu.be/Lkfjvd8oUys
+
 A scammer clones your voice from a 10-second Instagram clip, calls your father and says *"Papa, mera accident ho gaya, abhi ₹25,000 bhej do, kisi ko mat batana."* Voice Shield listens to the **real SIM call** on the phone, scores the voice for AI-generation, reads the conversation for scam pressure, and, the part no clone can beat, **asks the real son on his own phone: "Are you calling right now?"** Alexa+ then tells Papa what to do.
 
 > India reported ₹22,495 crore of cyber-fraud losses in 2025; "digital arrest" alone peaked at 1.24 lakh complaints in 2024. Every official advisory (FBI, FTC, RBI, Indian police) says the same thing: *don't trust the voice, call them back.* Voice Shield automates exactly that advice.
@@ -96,7 +98,7 @@ Live WhatsApp call with a consenting friend, 8 questions: while he answered hims
 
 ## Privacy
 
-Audio is processed on the laptop and discarded after each window; only aggregate risk events are kept. The remote caller's voice is personal data under India's DPDP Act, so no audio is uploaded; the optional Bedrock call receives transcript text only. The clone test set was made from the author's own voice with consent; we declined services that required publishing the voice model.
+Audio is processed on the laptop and discarded after each window; only aggregate risk events are kept. The remote caller's voice is personal data under India's DPDP Act, so no audio is uploaded; the optional Bedrock call receives transcript text only. The clone test set was made from the author's own voice and, with consent, a friend's voice; those recordings are not published in this repository; we declined services that required publishing the voice model.
 
 ## What was built during the hackathon
 
