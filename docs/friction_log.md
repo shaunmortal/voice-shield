@@ -65,3 +65,11 @@ Format per entry: task · steps · expected vs actual · severity · workaround 
 
 ## 12. MCP Python SDK 2.x field names
 - `mcp.Client.list_tools()` returns tools with `input_schema` (snake_case) and `call_tool` returns `structured_content` / `is_error`, while the JSON wire format and most docs say `inputSchema` / `structuredContent` / `isError`. **Severity:** low (one AttributeError). **Suggestion:** note the Pythonic field names in the migration guide.
+
+## 13. Alexa+ add-on tools are partner-only
+- **Task:** test Voice Shield inside real Alexa+ (Web Simulator / Local Inspector) and deploy it as an add-on.
+- **Steps:** read the Alexa+ MCP Toolkit QuickStart, looked for the `alexa-ai` CLI and simulator sign-up, checked the hackathon FAQ.
+- **Expected:** a sandbox or simulator for hackathon entrants. **Actual:** the Category SDK, MCP Toolkit, CLI and Web Simulator are "available to select partners only", with no way to apply.
+- **Severity:** critical (the track's target platform cannot be tested end to end).
+- **Workaround:** built to the published checklist (2025-11-25, Streamable HTTP, structuredContent, measured 1-3 ms vs the 500 ms limit), wrote `alexa/addon.json` in the QuickStart format, and simulated Alexa+ with a real MCP web client plus a Claude agent that reaches the server only through MCP; also verified with Claude Code as a second MCP client.
+- **Suggestion:** give hackathon entrants time-limited Web Simulator access, or publish the Local Inspector so add-ons can be validated against Alexa+'s real MCP client before partner approval.
