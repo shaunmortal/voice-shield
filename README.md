@@ -43,6 +43,8 @@ A scammer clones your voice from a 10-second Instagram clip, calls your father a
 
 All tools return `structuredContent` plus a text block, the shape Alexa+'s MCP client expects. `SKILL.md` teaches any agent how to use them.
 
+Any MCP-capable assistant can use the same server, for example Claude Code: `claude mcp add --transport http voice-shield http://127.0.0.1:8000/mcp`, then ask "is this call real?".
+
 ## Run it
 
 Needs macOS/Linux, Python 3.12+, ffmpeg, ~3 GB disk for the model (downloaded on first run).

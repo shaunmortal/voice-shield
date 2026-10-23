@@ -1,0 +1,9 @@
+## How Voice Shield meets the judging criteria
+**Tech Implementation:** a self-hosted MCP server, spec 2025-11-25 over Streamable HTTP (`server.py`, 5 tools returning structuredContent, read-only tools annotated; `test_mcp.py` checks the handshake and every tool). Measured round-trip is 1-3 ms against Alexa+'s 500 ms requirement. It captures real SIM and WhatsApp call audio from a stock Android phone without root, and all three detection layers were tested on real calls, not only simulations.
+
+**Design:** voice-first for an older parent in the middle of a call. They ask one question in Hindi ("Alexa, ye call asli hai kya?") and hear a calm two-sentence answer. The decisive check is one tap by the real family member on their own phone. Audio alone never raises an alarm, so a real son with a bad network is never called a fake.
+
+**Potential Impact:** India lost about ₹22,495 crore to cyber fraud in 2025, and "digital arrest" and "accident, send money" calls target exactly the parents who already talk to Alexa. Every official advisory says "call them back"; Voice Shield does that for them, then reads the official RBI / 1930 / cybercrime.gov.in steps if money already went. Route to users: an Alexa+ add-on; the manifest (`alexa/addon.json`) is ready in the MCP Toolkit QuickStart format for when partner access opens.
+
+**Quality of the Idea:** not a basic MCP wrapper. It is an agentic workflow that orchestrates across services on its own: live call audio, on-device Whisper, a Claude scam-language classifier, a who-speaks-when timing layer, Telegram confirmation from the real person, and fixed official guidance. It ships an Agent Skill (`SKILL.md`) that teaches any assistant when to call each tool, and the same server works from an existing AI assistant app (Claude Code) with one command. The key insight comes from our own real-call measurements: voice-deepfake scores fail on real WhatsApp calls (≈59 % EER), so we verify the person, not the voice.
+
