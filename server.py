@@ -22,9 +22,17 @@ import verify
 READ_ONLY = ToolAnnotations(readOnlyHint=True)
 
 
+class Words(TypedDict):
+    transcript: str
+    tactic: str  # family_emergency | bank_kyc_otp | digital_arrest | lottery_job | none
+    risk: float
+
+
 class CallStatus(TypedDict):
-    level: str  # listening | safe | suspicious | alert
+    level: str  # fused: listening | safe | suspicious | alert
+    audio_level: str  # voice layer alone
     risk: float  # smoothed P(AI-generated voice), 0-1
+    words: Words | None  # scam-language layer on the live transcript
     speech_seconds: float
     audio_live: bool
     say: str  # a sentence the assistant can speak as-is
@@ -61,8 +69,13 @@ def get_call_status() -> CallStatus:
     status, _ = shield.snapshot()
     stale = time.time() - status['updated'] > 5
     level = 'listening' if stale else status['level']
-    return {'level': level, 'risk': status['risk'], 'speech_seconds': status['speech_seconds'],
-            'audio_live': not stale, 'say': SAY[level]}
+    w = status['words']
+    say = SAY[level]
+    if w and w.get('risk', 0) >= 0.6:
+        say = w['say'] + ' ' + say
+    return {'level': level, 'audio_level': status['audio_level'], 'risk': status['risk'], 'speech_seconds': status['speech_seconds'],
+            'audio_live': not stale, 'say': say,
+            'words': None if not w else {'transcript': w['transcript'], 'tactic': w['tactic'], 'risk': w['risk']}}
 
 
 @mcp.tool(annotations=READ_ONLY, structured_output=True)

@@ -15,10 +15,14 @@ from collections import deque
 
 import numpy as np
 
+import content
+
 SR = 16000
 HOP_S = 1.0          # run Stage 1 every second
 WIN_S = 2.0          # on the last 2 s of audio
 CONFIRM_WIN_S = 4.0  # Stage 2 looks at a longer window
+WORDS_WIN_S = 12.0   # transcript window for the scam-language layer
+WORDS_EVERY_S = 6.0
 SPEECH_DBFS = -45    # below this RMS the window is treated as silence
 # Speech-Arena DF_Arena_500M (XLS-R + conformer head, ~230 ms per window on M1 MPS, non-commercial weights).
 # Stage 1 scores the last 2 s every second; Stage 2 re-scores the last 4 s only when Stage 1 is suspicious.
@@ -109,19 +113,47 @@ class Risk:
         return 'safe' if len(self.recent) >= 3 else 'listening'
 
 
+class Words:
+    """Layer 2: on-device Whisper transcript of the last WORDS_WIN_S seconds -> content.classify()."""
+
+    def __init__(self):
+        import mlx_whisper
+        self._tx = lambda a: mlx_whisper.transcribe(a, path_or_hf_repo='mlx-community/whisper-small-mlx', fp16=True)['text'].strip()
+        self.last = 0.0
+
+    def update(self, buf, now):
+        if now - self.last < WORDS_EVERY_S or dbfs(buf) < SPEECH_DBFS:
+            return None
+        self.last = now
+        text = self._tx(buf)
+        return {'transcript': text, **content.classify(text)}
+
+
+def fuse(audio_level, words):
+    """Audio boosts, words gate, humans decide: audio alone never goes past 'suspicious'."""
+    w = (words or {}).get('risk', 0.0)
+    if w >= 0.6 or (w >= 0.3 and audio_level == 'alert'):
+        return 'alert'
+    if audio_level in ('alert', 'suspicious') or w >= 0.3:
+        return 'suspicious'
+    return audio_level
+
+
 class Shield:
     """Runs the pipeline on a background thread and exposes a status snapshot."""
 
-    def __init__(self, source, detector=None):
+    def __init__(self, source, detector=None, words=True):
         self.source = source
         self.detector = detector or Detector()
+        self.words = Words() if words else None
         self.lock = threading.Lock()
         self.events = []  # alerts, newest last
         self._reset()
 
     def _reset(self):
         self.risk = Risk()
-        self.status = {'level': 'listening', 'risk': 0.0, 'speech_seconds': 0, 'stage2': None, 'updated': time.time()}
+        self.status = {'level': 'listening', 'audio_level': 'listening', 'risk': 0.0, 'speech_seconds': 0, 'stage2': None,
+                       'words': None, 'updated': time.time()}
 
     def start(self):
         threading.Thread(target=self.run, daemon=True).start()
@@ -130,20 +162,26 @@ class Shield:
     def run(self):
         buf = np.zeros(0, np.float32)
         for chunk in pcm_stream(self.source):
-            buf = np.concatenate([buf, chunk])[-int(SR * CONFIRM_WIN_S):]
-            p, s2 = self.detector.score(buf[-int(SR * WIN_S):], buf)
+            buf = np.concatenate([buf, chunk])[-int(SR * WORDS_WIN_S):]
+            p, s2 = self.detector.score(buf[-int(SR * WIN_S):], buf[-int(SR * CONFIRM_WIN_S):])
+            words = self.words.update(buf, time.time()) if self.words else None
             with self.lock:
                 st = self.status
                 st['updated'] = time.time()
-                if p is None:
+                if words:
+                    st['words'] = words
+                if p is None and not words:
                     continue
+                if p is not None:
+                    st['audio_level'] = self.risk.update(p)
+                    st['risk'] = round(self.risk.ema, 3)
+                    st['stage2'] = None if s2 is None else round(s2, 3)
+                    st['speech_seconds'] += HOP_S
                 prev = st['level']
-                st['level'] = self.risk.update(p)
-                st['risk'] = round(self.risk.ema, 3)
-                st['stage2'] = None if s2 is None else round(s2, 3)
-                st['speech_seconds'] += HOP_S
+                st['level'] = fuse(st['audio_level'], st['words'])
                 if st['level'] == 'alert' and prev != 'alert':
-                    self.events.append({'at': time.time(), 'risk': st['risk'], 'source': self.source})
+                    self.events.append({'at': time.time(), 'risk': st['risk'], 'source': self.source,
+                                        'tactic': (st['words'] or {}).get('tactic')})
 
     def snapshot(self):
         with self.lock:

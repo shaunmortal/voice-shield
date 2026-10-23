@@ -78,7 +78,7 @@
     suspicious: 'Saavdhaan. Is call ki awaaz mein kuch hissa machine jaisa lag raha hai. Abhi paise mat bhejiye.',
     alert: 'Chetavani! Ye awaaz AI se banayi gayi lag rahi hai. Ye voice cloning scam ho sakta hai. Paise mat bhejiye, OTP mat batayiye. Main Rohan se khud poochh sakti hoon ki wo call kar rahe hain ya nahi.',
   };
-  let voiceOn = false, last = 'listening';
+  let voiceOn = false, last = 'listening', lastTx = '';
   const speak = (text, lang = 'hi-IN') => {
     if (!voiceOn) return;
     speechSynthesis.cancel();
@@ -90,7 +90,9 @@
     document.body.dataset.level = s.level;
     title.textContent = TITLE[s.level]; say.textContent = s.say;
     bar.style.width = Math.round(s.risk * 100) + '%';
-    meta.textContent = `risk ${Math.round(s.risk * 100)}% · ${s.speech_seconds}s of speech analysed · ${s.audio_live ? 'live audio' : 'no audio'}`;
+    const w = s.words;
+    meta.textContent = `voice ${Math.round(s.risk * 100)}% · words ${w ? Math.round(w.risk * 100) + '% ' + w.tactic.replace('_', ' ') : '–'} · ${s.speech_seconds}s analysed · ${s.audio_live ? 'live audio' : 'no audio'}`;
+    if (w && w.transcript && w.transcript !== lastTx) { lastTx = w.transcript; log('t', 'heard: ' + w.transcript); }
     if (s.level !== last && SPEAK[s.level]) speak(SPEAK[s.level]);
     last = s.level;
   }
