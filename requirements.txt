@@ -1,0 +1,12 @@
+mcp==2.3.0
+uvicorn==0.54.0
+starlette==1.9.0
+torch==2.14.1
+transformers==5.20.2
+safetensors==0.8.0
+einops==0.8.2
+soundfile==0.14.0
+numpy==2.5.4
+huggingface-hub
+# optional: Bedrock words layer
+boto3

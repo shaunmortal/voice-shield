@@ -1,6 +1,12 @@
 .venv/
+.venv-tts/
 __pycache__/
 *.wav
 *.mka
+*.m4a
+*.aiff
 models/
+data/eval/
+data/calltest/
 .env
+.DS_Store
