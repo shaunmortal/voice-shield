@@ -11,8 +11,8 @@ An Alexa+ MCP add-on that checks live phone and WhatsApp calls, asks the real fa
 
 [![Demo video](https://img.shields.io/badge/▶%20Demo%20video-2%3A53-FF0000?logo=youtube&logoColor=white)](https://youtu.be/Lkfjvd8oUys)
 [![MCP](https://img.shields.io/badge/MCP-2025--11--25%20·%20Streamable%20HTTP-5A45FF)](server.py)
-[![Latency](https://img.shields.io/badge/round--trip-1--3%20ms%20(limit%20500%20ms)-2ea44f)](#ready-for-the-alexa-mcp-toolkit)
-[![Android](https://img.shields.io/badge/Android-real%20SIM%20%2B%20WhatsApp%20calls,%20no%20root-3DDC84?logo=android&logoColor=white)](#live-sim-call-capture-android-no-root)
+[![Latency](https://img.shields.io/badge/round--trip-1--3%20ms%20(limit%20500%20ms)-2ea44f)](#-ready-for-the-alexa-mcp-toolkit)
+[![Android](https://img.shields.io/badge/Android-real%20SIM%20%2B%20WhatsApp%20calls,%20no%20root-3DDC84?logo=android&logoColor=white)](#-live-sim-call-capture-android-no-root)
 [![Claude](https://img.shields.io/badge/Claude-Opus%205.5-D97757)](content.py)
 [![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)](requirements.txt)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -85,7 +85,7 @@ All tools return `structuredContent` plus a text block, the shape Alexa+'s MCP c
 
 Any MCP-capable assistant can use the same server, for example Claude Code: `claude mcp add --transport http voice-shield http://127.0.0.1:8000/mcp`, then ask "is this call real?".
 
-## Run it
+## 🚀 Run it
 
 Needs macOS/Linux, Python 3.12+, ffmpeg, ~3 GB disk for the model (downloaded on first run).
 
@@ -103,10 +103,12 @@ Public HTTPS for a remote client: `cloudflared tunnel --url http://localhost:800
 
 Optional: `.env` with `ANTHROPIC_API_KEY` (words layer on **Claude Opus 5.5** with structured JSON output: it scored an ordinary "Didi, put 5,000 in my account, I'll return it Sunday" at 0.10 where keywords said 0.30, and still flagged a garbled phone-ASR fragment with "police case… paise… jaldi" at 0.55), `TELEGRAM_BOT_TOKEN` / `TELEGRAM_FAMILY_CHAT_ID` (family verification) and AWS credentials (`AWS_ACCESS_KEY_ID`…) to route the words layer through **Amazon Bedrock Nova Micro** (code path written, not yet run against the live service); without them the words layer uses an offline keyword classifier, and only transcript text ever leaves the device, never audio.
 
-### Live SIM call capture (Android, no root)
+### 📱 Live SIM call capture (Android, no root)
 `scrcpy --audio-source=voice-call` returns both sides of a VoLTE call on **Oppo F25 Pro / ColorOS 16 / Android 16** with USB debugging on ("Disable permission monitoring" + USB mode *File transfer*). Many other OEM builds return silence; the engine is source-agnostic, so the mic path works everywhere. Production would move the same engine into an OEM dialer or carrier IMS layer, as Google's Pixel Scam Detection and LG U+ ixi-O do.
 
-## Ready for the Alexa+ MCP Toolkit
+## ✅ Ready for the Alexa+ MCP Toolkit
+
+<p align="center"><img src="alexa/carousel_600x900.png" width="200" alt="Alexa+ add-on card" /> &nbsp; <img src="alexa/icons/icon_126.png" width="96" alt="add-on icon" /></p>
 
 Alexa+ add-on tools are partner-only, so we could not deploy, but the server is built to Amazon's published MCP Toolkit requirements, and `alexa/addon.json` is the add-on manifest in the QuickStart format (listing, example phrases, privacy/terms links, all six icon sizes, a 600x900 carousel image, MCP endpoint). Set the endpoint to your tunnel URL; we have not validated it with the private `alexa-ai` CLI.
 
@@ -117,12 +119,14 @@ Alexa+ add-on tools are partner-only, so we could not deploy, but the server is 
 | Round-trip under 500 ms | measured over HTTP on M1: median 1.2-1.3 ms, p95 under 3 ms for `get_call_status`, `what_should_i_do`, `get_alert_history` (50 calls each) |
 | Structured results | `structuredContent` plus a text block; read-only tools annotated |
 
-## Payment Guard: stop the scam at the payment
+## 💸 Payment Guard: stop the scam at the payment
 A scam ends at the payment, not at the call. While a call is on (and for 5 minutes after it), Voice Shield watches which app is open on the parent's phone over adb, no root. The moment PhonePe, Google Pay, Paytm, BHIM or Amazon Pay opens, it asks the real son on Telegram by itself, before any money moves: "Papa ne call ke dauraan abhi PhonePe khola hai, paise bhejne wale hain. Kya aap abhi ye call kar rahe ho?" His "No" turns the call into an alert, and `get_call_status` tells Alexa+ to say "wait, your family member is confirming". No voice score is involved, so it works however perfect the clone is. Real run on the Oppo F25 Pro: call started 23:39:12, PhonePe opened 23:39:30 and the question went out the same second, "No" arrived 23:40:00 (`payguard.py`).
 
 ![Payment Guard real run](video/gallery/7_payment_guard.png)
 
-## The numbers (measured, our own voice)
+## 📊 The numbers (measured, our own voice)
+
+<p align="center"><img src="video/gallery/4_real_call_numbers.png" width="85%" alt="Real-call numbers" /></p>
 
 Test set: one consenting team member's voice (bona fide, 4 recordings, 512 four-second windows) versus clones of that voice made with two open tools on the same laptop, **F5-TTS** (MLX) and **Chatterbox-Multilingual** (Hindi + English), reading scam scripts from `data/scripts.txt`. Channel conditions simulated with ffmpeg (`eval.py`).
 
@@ -148,24 +152,26 @@ Read these honestly:
 - `ffmpeg loudnorm` on the real recordings turned them "synthetic" (logit margin −11 → +4.6). Static gain only. Details in `docs/friction_log.md`.
 - Latency on M1 (8 GB): ~230 ms per 4 s window on MPS, 1 s hop → first alert 3–5 s after cloned speech starts.
 
-## Timing layer (who speaks when)
+## ⏱️ Timing layer (who speaks when)
+
+<p align="center"><img src="video/gallery/5_timing.png" width="85%" alt="Timing layer results" /></p>
 
 `turns.py` pairs the caller's audio (Oppo, `scrcpy --audio-source=playback --audio-dup` during a WhatsApp call) with the user's voice (laptop mic) in 20 ms frames and tracks the caller's reply gap after each user turn and the "haan / hmm" backchannels the caller makes while the user talks. Humans reply in ≈0.2 s and backchannel constantly (Stivers et al. 2009); production AI voice agents reply in 1.3-3.8 s and almost never backchannel (Cekura 2026, Full-Duplex-Bench 2025).
 
 Live WhatsApp call with a consenting friend, 8 questions: while he answered himself he backchannelled 7 times and the median reply gap was 0.6-0.8 s (WhatsApp adds network delay); when he answered by playing his own clone, like a scammer pressing play, backchannels stayed at zero and the median gap rose to 1.1 s. The first version averaged the whole call, so the human half masked the scripted half and no "bot-like" flag fired; it now judges the last 4 replies (`turns.py` self-test covers a human-then-bot call). One call, one speaker: indicative only.
 
-## Privacy
+## 🔒 Privacy
 
 Audio is processed on the laptop and discarded after each window; only aggregate risk events are kept. The remote caller's voice is personal data under India's DPDP Act, so no audio is uploaded; the optional Bedrock call receives transcript text only. The clone test set was made from the author's own voice and, with consent, a friend's voice; those recordings are not published in this repository; we declined services that required publishing the voice model.
 
-## What was built during the hackathon
+## 🏗️ What was built during the hackathon
 
 Everything in this repository (21–23 Oct 2026). The idea descends from our SIH 2026 problem-statement design (voice-clone detection on cellular calls), of which no code survived; the capture path, detector evaluation, MCP server, Alexa+ client, Telegram verification and scam-language layer are new.
 
-## Built on Digi Sanrakshak
+## 🤝 Built on Digi Sanrakshak
 
 `data/trusted_routes.json` and `data/action_text.json` (the authority-sourced "what to do now" steps behind `what_should_i_do`, in English and Hindi) and the scam-tactic taxonomy come from our team's earlier MIT-licensed project [Digi Sanrakshak](https://github.com/harsh-1-code/Sanrakshak_AI). Those strings are deliberately not generated: they follow RBI, I4C (1930) and cybercrime.gov.in guidance.
 
-## Licenses
+## 📜 Licenses
 
 Code: MIT. Model weights are downloaded at runtime and keep their own licenses: `Speech-Arena-2025/DF_Arena_500M_V_1` (non-commercial), `nii-yamagishilab/wav2vec-small-anti-deepfake` (CC BY-NC-SA 4.0, evaluation only). Clone tools used for testing: F5-TTS (CC BY-NC weights), Chatterbox (MIT).
