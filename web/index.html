@@ -88,13 +88,23 @@
   let voiceOn = false, last = 'listening', lastTx = '', demoStarted = false;
   const DEMO = new URLSearchParams(location.search).has('demo');
   const mark = (name, text) => DEMO && fetch('/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, text }) });
-  const speak = (text, lang = 'hi-IN') => {
+  let player = null;
+  const speak = async (text, _lang) => {
+    const lang = /[\u0900-\u097F]/.test(text) ? 'hi-IN' : 'en-IN';  // Devanagari -> Swara, Roman Hinglish/English -> Neerja
     mark('speak', text);
     if (!voiceOn) return;
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text); u.lang = lang;
-    u.voice = speechSynthesis.getVoices().find(v => v.lang.startsWith(lang.slice(0, 2))) || null;
-    speechSynthesis.speak(u);
+    try {  // natural neural voice from the server
+      const r = await fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ text, lang }) });
+      if (!r.ok) throw new Error(r.status);
+      if (player) player.pause();
+      player = new Audio(URL.createObjectURL(await r.blob())); await player.play();
+    } catch {  // offline fallback: the browser's built-in voice
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text); u.lang = lang;
+      u.voice = speechSynthesis.getVoices().find(v => v.lang.startsWith(lang.slice(0, 2))) || null;
+      speechSynthesis.speak(u);
+    }
   };
   function render(s) {
     document.body.dataset.level = s.level;

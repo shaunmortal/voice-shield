@@ -186,6 +186,20 @@ async def api_assistant(request):
     return JSONResponse(out)
 
 
+@mcp.custom_route('/api/tts', methods=['POST'])
+async def api_tts(request):
+    """Natural Alexa voice: Microsoft Edge neural TTS (Swara for Hindi/Hinglish, Neerja for English). Needs internet."""
+    import edge_tts
+    from starlette.responses import Response
+    body = await request.json()
+    voice = 'hi-IN-SwaraNeural' if body.get('lang', 'hi').startswith('hi') else 'en-IN-NeerjaExpressiveNeural'
+    audio = b''
+    async for chunk in edge_tts.Communicate(body.get('text', ''), voice, rate='+5%').stream():
+        if chunk['type'] == 'audio':
+            audio += chunk['data']
+    return Response(audio, media_type='audio/mpeg')
+
+
 @mcp.custom_route('/api/reset', methods=['POST'])
 async def api_reset(_):
     return JSONResponse({'ok': reset_call()})
