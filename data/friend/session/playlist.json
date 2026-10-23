@@ -1,0 +1,98 @@
+[
+ {
+  "label": "f5",
+  "file": "a01.wav",
+  "start": 2.9,
+  "end": 11.017312500000001
+ },
+ {
+  "label": "bonafide_replay",
+  "file": "00.wav",
+  "start": 14.417312500000001,
+  "end": 24.4173125
+ },
+ {
+  "label": "f5",
+  "file": "b01.wav",
+  "start": 27.8173125,
+  "end": 35.0493125
+ },
+ {
+  "label": "bonafide_replay",
+  "file": "03.wav",
+  "start": 38.4493125,
+  "end": 45.7693125
+ },
+ {
+  "label": "f5",
+  "file": "b03.wav",
+  "start": 49.1693125,
+  "end": 57.6173125
+ },
+ {
+  "label": "bonafide_replay",
+  "file": "06.wav",
+  "start": 61.017312499999996,
+  "end": 68.1973125
+ },
+ {
+  "label": "f5",
+  "file": "e01.wav",
+  "start": 71.5973125,
+  "end": 77.698625
+ },
+ {
+  "label": "bonafide_replay",
+  "file": "09.wav",
+  "start": 81.09862500000001,
+  "end": 91.09862500000001
+ },
+ {
+  "label": "f5",
+  "file": "e02.wav",
+  "start": 94.49862500000002,
+  "end": 101.03725000000001
+ },
+ {
+  "label": "bonafide_replay",
+  "file": "13.wav",
+  "start": 104.43725000000002,
+  "end": 114.43725000000002
+ },
+ {
+  "label": "f5",
+  "file": "e04.wav",
+  "start": 117.83725000000003,
+  "end": 123.76787500000003
+ },
+ {
+  "label": "bonafide_replay",
+  "file": "16.wav",
+  "start": 127.16787500000004,
+  "end": 130.58787500000003
+ },
+ {
+  "label": "f5",
+  "file": "n01.wav",
+  "start": 133.98787500000003,
+  "end": 140.18518750000004
+ },
+ {
+  "label": "bonafide_replay",
+  "file": "19.wav",
+  "start": 143.58518750000005,
+  "end": 146.84518750000004
+ },
+ {
+  "label": "f5",
+  "file": "n05.wav",
+  "start": 150.24518750000004,
+  "end": 156.90118750000005
+ },
+ {
+  "label": "bonafide_replay",
+  "file": "22.wav",
+  "start": 160.30118750000005,
+  "end": 165.64118750000006
+ }
+]
