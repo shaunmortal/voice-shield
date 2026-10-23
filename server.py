@@ -68,9 +68,13 @@ def get_call_status() -> CallStatus:
     Use for questions like 'Is this call real?', 'Is my son really calling?', 'Is this a scam?'."""
     status, _ = shield.snapshot()
     stale = time.time() - status['updated'] > 5
-    level = 'listening' if stale else status['level']
+    level = status['level']  # keep the verdict after audio stops; reset_call() starts the next call
     w = status['words']
     say = SAY[level]
+    if status.get('family') == 'no':
+        say = 'Your family member says they are not calling. Treat this as a scam: hang up, do not pay.'
+    elif status.get('family') == 'yes':
+        say = 'Your family member confirmed it is them.'
     if w and w.get('risk', 0) >= 0.6:
         say = w['say'] + ' ' + say
     return {'level': level, 'audio_level': status['audio_level'], 'risk': status['risk'], 'speech_seconds': status['speech_seconds'],
@@ -96,7 +100,9 @@ def verify_with_family(claimed_person: str, reason: str = 'the caller is asking 
     """Ask the REAL family member, on their own phone, whether they are the one calling right now.
     Use when the caller claims to be a relative and asks for money, an OTP, or secrecy, whatever the voice score says.
     Waits up to 25 seconds for their answer."""
-    return verify.verify(claimed_person, reason)
+    v = verify.verify(claimed_person, reason)
+    shield.set_family(v['answer'])
+    return v
 
 
 @mcp.tool()
@@ -118,6 +124,16 @@ async def index(_):
 async def api_status(_):
     status, events = shield.snapshot()
     return JSONResponse({**get_call_status(), 'stage2': status['stage2'], 'alerts': len(events)})
+
+
+EVENTS = []  # demo timeline from the web client (used to place the spoken replies when editing the video)
+
+
+@mcp.custom_route('/api/event', methods=['POST', 'GET'])
+async def api_event(request):
+    if request.method == 'POST':
+        EVENTS.append({'t': time.time(), **(await request.json())})
+    return JSONResponse(EVENTS)
 
 
 @mcp.custom_route('/api/reset', methods=['POST'])

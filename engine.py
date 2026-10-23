@@ -114,23 +114,35 @@ class Risk:
 
 
 class Words:
-    """Layer 2: on-device Whisper transcript of the last WORDS_WIN_S seconds -> content.classify()."""
+    """Layer 2: on-device Whisper transcript of the last WORDS_WIN_S seconds -> content.classify().
+    Runs on its own thread so a slow transcription never stalls the audio loop."""
 
-    def __init__(self):
+    def __init__(self, on_result):
         import mlx_whisper
         self._tx = lambda a: mlx_whisper.transcribe(a, path_or_hf_repo='mlx-community/whisper-small-mlx', fp16=True)['text'].strip()
-        self.last = 0.0
+        self.on_result, self.last, self.busy = on_result, 0.0, False
+
+    def _work(self, buf):
+        try:
+            text = self._tx(buf)
+            self.on_result({'transcript': text, **content.classify(text)})
+        finally:
+            self.busy = False
 
     def update(self, buf, now):
-        if now - self.last < WORDS_EVERY_S or dbfs(buf) < SPEECH_DBFS:
-            return None
-        self.last = now
-        text = self._tx(buf)
-        return {'transcript': text, **content.classify(text)}
+        """Start a transcription if one is due; the result arrives later through on_result."""
+        if not self.busy and now - self.last >= WORDS_EVERY_S and dbfs(buf) >= SPEECH_DBFS:
+            self.last, self.busy = now, True
+            threading.Thread(target=self._work, args=(buf.copy(),), daemon=True).start()
 
 
-def fuse(audio_level, words):
-    """Audio boosts, words gate, humans decide: audio alone never goes past 'suspicious'."""
+def fuse(audio_level, words, family=None):
+    """Audio boosts, words gate, humans decide: audio alone never goes past 'suspicious'.
+    family: answer from verify_with_family ('yes' | 'no' | None) overrides everything."""
+    if family == 'no':
+        return 'alert'
+    if family == 'yes':
+        return 'safe'
     w = (words or {}).get('risk', 0.0)
     if w >= 0.6 or (w >= 0.3 and audio_level == 'alert'):
         return 'alert'
@@ -145,7 +157,7 @@ class Shield:
     def __init__(self, source, detector=None, words=True):
         self.source = source
         self.detector = detector or Detector()
-        self.words = Words() if words else None
+        self.words = Words(self._on_words) if words else None
         self.lock = threading.Lock()
         self.events = []  # alerts, newest last
         self._reset()
@@ -153,7 +165,7 @@ class Shield:
     def _reset(self):
         self.risk = Risk()
         self.status = {'level': 'listening', 'audio_level': 'listening', 'risk': 0.0, 'speech_seconds': 0, 'stage2': None,
-                       'words': None, 'updated': time.time()}
+                       'words': None, 'family': None, 'updated': time.time()}
 
     def start(self):
         threading.Thread(target=self.run, daemon=True).start()
@@ -164,24 +176,38 @@ class Shield:
         for chunk in pcm_stream(self.source):
             buf = np.concatenate([buf, chunk])[-int(SR * WORDS_WIN_S):]
             p, s2 = self.detector.score(buf[-int(SR * WIN_S):], buf[-int(SR * CONFIRM_WIN_S):])
-            words = self.words.update(buf, time.time()) if self.words else None
+            if self.words:
+                self.words.update(buf, time.time())
             with self.lock:
                 st = self.status
                 st['updated'] = time.time()
-                if words:
-                    st['words'] = words
-                if p is None and not words:
+                if p is None:
                     continue
-                if p is not None:
-                    st['audio_level'] = self.risk.update(p)
-                    st['risk'] = round(self.risk.ema, 3)
-                    st['stage2'] = None if s2 is None else round(s2, 3)
-                    st['speech_seconds'] += HOP_S
-                prev = st['level']
-                st['level'] = fuse(st['audio_level'], st['words'])
-                if st['level'] == 'alert' and prev != 'alert':
-                    self.events.append({'at': time.time(), 'risk': st['risk'], 'source': self.source,
-                                        'tactic': (st['words'] or {}).get('tactic')})
+                st['audio_level'] = self.risk.update(p)
+                st['risk'] = round(self.risk.ema, 3)
+                st['stage2'] = None if s2 is None else round(s2, 3)
+                st['speech_seconds'] += HOP_S
+                self._refuse()
+
+    def _refuse(self):
+        """Recompute the fused level; caller holds the lock."""
+        st = self.status
+        prev = st['level']
+        st['level'] = fuse(st['audio_level'], st['words'], st['family'])
+        if st['level'] == 'alert' and prev != 'alert':
+            self.events.append({'at': time.time(), 'risk': st['risk'], 'source': self.source,
+                                'tactic': 'family_denied' if st['family'] == 'no' else (st['words'] or {}).get('tactic')})
+
+    def _on_words(self, words):
+        with self.lock:
+            self.status['words'] = words
+            self._refuse()
+
+    def set_family(self, answer):
+        with self.lock:
+            st = self.status
+            st['family'] = answer if answer in ('yes', 'no') else None
+            self._refuse()
 
     def snapshot(self):
         with self.lock:

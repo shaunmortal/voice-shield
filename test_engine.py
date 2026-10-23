@@ -15,8 +15,8 @@ silence = os.path.join(d, 'silence.wav')
 subprocess.run(['ffmpeg', '-loglevel', 'error', '-f', 'lavfi', '-i', 'anullsrc=r=16000:cl=mono', '-t', '6', silence], check=True)
 
 det = Detector()
-for path, want in ((tts, 'alert'), (silence, 'listening')):
-    s = Shield(f'file:{path}', det)
+for path, want in ((tts, 'suspicious'), (silence, 'listening')):  # audio alone caps at suspicious
+    s = Shield(f'file:{path}', det, words=False)
     s.run()  # file sources end, so run synchronously
     status, events = s.snapshot()
     assert status['level'] == want, (path, status)

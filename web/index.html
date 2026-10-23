@@ -78,8 +78,11 @@
     suspicious: 'Saavdhaan. Is call ki awaaz mein kuch hissa machine jaisa lag raha hai. Abhi paise mat bhejiye.',
     alert: 'Chetavani! Ye awaaz AI se banayi gayi lag rahi hai. Ye voice cloning scam ho sakta hai. Paise mat bhejiye, OTP mat batayiye. Main Rohan se khud poochh sakti hoon ki wo call kar rahe hain ya nahi.',
   };
-  let voiceOn = false, last = 'listening', lastTx = '';
+  let voiceOn = false, last = 'listening', lastTx = '', demoStarted = false;
+  const DEMO = new URLSearchParams(location.search).has('demo');
+  const mark = (name, text) => DEMO && fetch('/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, text }) });
   const speak = (text, lang = 'hi-IN') => {
+    mark('speak', text);
     if (!voiceOn) return;
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text); u.lang = lang;
@@ -93,7 +96,13 @@
     const w = s.words;
     meta.textContent = `voice ${Math.round(s.risk * 100)}% · words ${w ? Math.round(w.risk * 100) + '% ' + w.tactic.replace('_', ' ') : '–'} · ${s.speech_seconds}s analysed · ${s.audio_live ? 'live audio' : 'no audio'}`;
     if (w && w.transcript && w.transcript !== lastTx) { lastTx = w.transcript; log('t', 'heard: ' + w.transcript); }
+    if (s.level !== last) mark('level', s.level);
     if (s.level !== last && SPEAK[s.level]) speak(SPEAK[s.level]);
+    if (DEMO && s.level === 'suspicious' && last !== 'suspicious' && !demoStarted) {
+      demoStarted = true;
+      setTimeout(() => askStatus.click(), 5000);
+      setTimeout(() => askVerify.click(), 14000);
+    }
     last = s.level;
   }
   async function tick() {
@@ -103,12 +112,12 @@
 
   voice.onclick = () => { voiceOn = true; voice.textContent = '🔊 Alexa voice on'; speak('Voice Shield chalu hai.'); };
   askStatus.onclick = async () => {
-    log('u', 'User: "Alexa, is this call real?"');
+    log('u', 'User: "Alexa, is this call real?"'); mark('user', 'Alexa, is this call real?');
     const s = await call('get_call_status'); render(s);
     log('a', 'Alexa: ' + s.say); speak(s.say, 'en-IN');
   };
   askVerify.onclick = async () => {
-    log('u', 'User: "Alexa, ask Rohan if it\'s really him."');
+    log('u', 'User: "Alexa, ask Rohan if it\'s really him."'); mark('user', "Alexa, ask Rohan if it's really him.");
     const wait = 'Theek hai, main Rohan ke phone par poochh rahi hoon. Jawab aane tak paise mat bhejiye.';
     log('a', 'Alexa: ' + wait); speak(wait);
     const v = await call('verify_with_family', { claimed_person: 'Rohan', reason: 'voice looks AI-generated and the caller is asking for money' });
