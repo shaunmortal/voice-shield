@@ -56,7 +56,7 @@ Open **http://localhost:8000/** — the page is a real MCP client (initialize �
 
 Public HTTPS for a remote client: `cloudflared tunnel --url http://localhost:8000`, then restart with `PUBLIC_HOST=<name>.trycloudflare.com`. The server runs in JSON-response, stateless mode because quick tunnels do not pass SSE.
 
-Optional: `.env` with `TELEGRAM_BOT_TOKEN` / `TELEGRAM_FAMILY_CHAT_ID` (family verification) and AWS credentials (`AWS_ACCESS_KEY_ID`…) to route the words layer through **Amazon Bedrock Nova Micro**; without them the words layer uses an offline keyword classifier, and only transcript text ever leaves the device, never audio.
+Optional: `.env` with `TELEGRAM_BOT_TOKEN` / `TELEGRAM_FAMILY_CHAT_ID` (family verification) and AWS credentials (`AWS_ACCESS_KEY_ID`…) to route the words layer through **Amazon Bedrock Nova Micro** (code path written, not yet run against the live service); without them the words layer uses an offline keyword classifier, and only transcript text ever leaves the device, never audio.
 
 ### Live SIM call capture (Android, no root)
 `scrcpy --audio-source=voice-call` returns both sides of a VoLTE call on **Oppo F25 Pro / ColorOS 16 / Android 16** with USB debugging on ("Disable permission monitoring" + USB mode *File transfer*). Many other OEM builds return silence; the engine is source-agnostic, so the mic path works everywhere. Production would move the same engine into an OEM dialer or carrier IMS layer, as Google's Pixel Scam Detection and LG U+ ixi-O do.

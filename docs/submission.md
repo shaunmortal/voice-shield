@@ -2,7 +2,7 @@
 
 **Project name:** Voice Shield
 **Tagline:** "Alexa, is this really my son calling?" — live voice-clone scam defence for the family phone, as an Alexa+ MCP add-on.
-**Track:** Alexa+ (self-hosted MCP server, spec 2025-11-25, Streamable HTTP) · **Mini challenge:** Open Source (MIT) · AWS Builder only if Bedrock is wired with real credentials.
+**Track:** Alexa+ (self-hosted MCP server, spec 2025-11-25, Streamable HTTP) · **Mini challenge:** Open Source (MIT). Not entering AWS Builder: the Bedrock path is written but our AWS account was not activated in time, so it was never run against the live service.
 
 ## Description (what it does, how it works)
 
@@ -16,7 +16,7 @@ We measured it on our own voice, including a real VoLTE call: clones from two op
 
 **Alexa+ MCP Toolkit / Add-on docs.** Read, not used, since access is partner-only. The published requirements (Streamable HTTP, <500 ms, OAuth 2.1 with static client) were a useful design target; we hit 230 ms per window locally. Feedback: give hackathon entrants a sandbox Alexa+ client or at least the local inspector, and state in the docs which MCP SDK major version the snippets target. Would build for Alexa+ again: yes, the caretaking use case fits the device exactly.
 
-**Amazon Bedrock (Nova Micro, Converse API).** Integrated as the words-layer classifier behind a feature flag; cost at ~₹2 per 1,000 classifications is right for an always-on home feature. Feedback: Nova Micro is us-east-1 only for Indian accounts without cross-region inference; the pricing page does not render without JavaScript. (If no AWS credentials were available at submission time, this integration is code-complete but untested against the live service; say so.)
+**Amazon Bedrock (Nova Micro, Converse API).** Written as the words-layer classifier behind a feature flag but NOT run against the live service (our account's sign-up was still pending activation, "up to 24 hours", on deadline day); cost at ~₹2 per 1,000 classifications is right for an always-on home feature. Feedback: Nova Micro is us-east-1 only for Indian accounts without cross-region inference; the pricing page does not render without JavaScript.
 
 **scrcpy (voice-call audio source).** Not an Amazon tool but the enabling one: it is the only non-root path we found to real cellular call audio, and it worked on an Oppo F25 Pro. OEM-dependent; Amazon/Ring could offer a privileged on-device hook for exactly this.
 
