@@ -64,6 +64,17 @@ Optional: `.env` with `ANTHROPIC_API_KEY` (words layer on **Claude Opus 5.5** wi
 ### Live SIM call capture (Android, no root)
 `scrcpy --audio-source=voice-call` returns both sides of a VoLTE call on **Oppo F25 Pro / ColorOS 16 / Android 16** with USB debugging on ("Disable permission monitoring" + USB mode *File transfer*). Many other OEM builds return silence; the engine is source-agnostic, so the mic path works everywhere. Production would move the same engine into an OEM dialer or carrier IMS layer, as Google's Pixel Scam Detection and LG U+ ixi-O do.
 
+## Ready for the Alexa+ MCP Toolkit
+
+Alexa+ add-on tools are partner-only, so we could not deploy, but the server is built to Amazon's published MCP Toolkit requirements, and `alexa/addon.json` is the add-on manifest in the QuickStart format (listing, example phrases, privacy/terms links, all six icon sizes, a 600x900 carousel image, MCP endpoint). Set the endpoint to your tunnel URL; we have not validated it with the private `alexa-ai` CLI.
+
+| Requirement (Alexa+ MCP QuickStart) | Voice Shield |
+|---|---|
+| MCP 2025-11-25, Streamable HTTP | yes (`test_mcp.py` checks the handshake) |
+| Public HTTPS URL, tunnel OK for dev | Cloudflare quick tunnel (stateless, JSON responses) |
+| Round-trip under 500 ms | measured over HTTP on M1: median 1.2-1.3 ms, p95 under 3 ms for `get_call_status`, `what_should_i_do`, `get_alert_history` (50 calls each) |
+| Structured results | `structuredContent` plus a text block; read-only tools annotated |
+
 ## The numbers (measured, our own voice)
 
 Test set: one consenting team member's voice (bona fide, 4 recordings, 512 four-second windows) versus clones of that voice made with two open tools on the same laptop, **F5-TTS** (MLX) and **Chatterbox-Multilingual** (Hindi + English), reading scam scripts from `data/scripts.txt`. Channel conditions simulated with ffmpeg (`eval.py`).

@@ -1,0 +1,46 @@
+{
+  "manifestVersion": "1.0",
+  "storeListing": {
+    "distributionCountries": ["US"],
+    "locales": {
+      "en-US": {
+        "name": "Voice Shield",
+        "shortDescription": "Checks if a family member's call is an AI voice clone, asks the real person to confirm, and tells you what to do.",
+        "fullDescription": "Voice Shield watches the phone or WhatsApp call you are on right now. It listens for scam pressure in the words (urgent money, OTP, secrecy, police threats), checks the caller's reply timing, and scores the voice for AI generation. Because voice scores are unreliable on real calls, the voice alone never raises an alarm: Voice Shield asks the real family member, on their own phone, whether they are calling. A clone can copy a voice; it cannot press the button on the real person's phone. If money was already sent, it reads the official next steps (bank, 1930 helpline, cybercrime portal). Audio stays on your own device.",
+        "examplePhrases": [
+          "Alexa, ask Voice Shield if this call is real",
+          "Alexa, ask Voice Shield to check with my son if he is calling",
+          "Alexa, I already sent ten thousand rupees, what should I do",
+          "Alexa, ask Voice Shield what happened on my last call"
+        ],
+        "privacyAndCompliance": {
+          "privacyPolicyUrl": "https://github.com/shaunmortal/voice-shield#privacy",
+          "termsOfUseUrl": "https://github.com/shaunmortal/voice-shield/blob/master/LICENSE"
+        },
+        "mediaAssets": {
+          "icons": {
+            "light": {
+              "64": "icons/icon_64.png",
+              "72": "icons/icon_72.png",
+              "88": "icons/icon_88.png",
+              "126": "icons/icon_126.png",
+              "180": "icons/icon_180.png",
+              "241": "icons/icon_241.png"
+            }
+          },
+          "carouselImages": ["carousel_600x900.png"]
+        }
+      }
+    }
+  },
+  "integrations": [
+    {
+      "type": "MCP",
+      "config": {
+        "endpoints": {
+          "default": { "type": "HTTPS", "uri": "https://YOUR-TUNNEL.trycloudflare.com/mcp" }
+        }
+      }
+    }
+  ]
+}
