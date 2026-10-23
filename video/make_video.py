@@ -29,10 +29,16 @@ def dur(path):
     return float(out)
 
 
+EDGE = os.path.join(ROOT, '.venv', 'bin', 'edge-tts')
+VOICES = {'narrator': 'en-IN-PrabhatNeural', 'papa': 'hi-IN-MadhurNeural',
+          'alexa_en': 'en-IN-NeerjaExpressiveNeural', 'alexa_hi': 'hi-IN-SwaraNeural'}
+
+
 def tts(name, text, voice, rate=None):
-    aiff, wav = os.path.join(B, name + '.aiff'), os.path.join(B, name + '.wav')
-    run('say', '-v', voice, *(['-r', str(rate)] if rate else []), '-o', aiff, text)
-    run('ffmpeg', '-y', '-i', aiff, '-ar', str(SR), '-ac', '2', wav)
+    """Microsoft Edge neural TTS (needs internet). voice: a key of VOICES."""
+    mp3, wav = os.path.join(B, name + '.mp3'), os.path.join(B, name + '.wav')
+    run(EDGE, '--voice', VOICES[voice], f'--rate={rate or "+0%"}', '--text', text, '--write-media', mp3)
+    run('ffmpeg', '-y', '-i', mp3, '-ar', str(SR), '-ac', '2', wav)
     return wav
 
 
@@ -135,8 +141,7 @@ clone = os.path.join(B, 'hook_clone.wav')
 run('ffmpeg', '-y', '-i', os.path.join(ROOT, 'data/clones/chatterbox/e01.wav'), '-i', os.path.join(ROOT, 'data/clones/f5/e02.wav'),
     '-filter_complex', '[0]aresample=48000,apad=pad_dur=0.6[a];[1]aresample=48000[b];[a][b]concat=n=2:v=0:a=1,pan=stereo|c0=c0|c1=c0',
     '-ar', str(SR), clone)
-n1 = tts('n_hook', "That was not me. It is an A I clone of my voice, made on this laptop from two minutes of audio. "
-                   "Now imagine my father hearing it on a phone call.", 'Aman')
+n1 = tts('n_hook', "That was not me. It's an AI clone of my voice, made on this laptop. Now imagine my father hearing it on a call.", 'narrator', rate='+10%')
 c_len = dur(clone)
 hook_png = slide('s_hook', [('“Papa, mera accident ho gaya hai…', 70, FG, UNI, 18),
                             ('abhi pachaas hazaar bhej do, kisi ko mat batana.”', 70, FG, UNI, 70),
@@ -145,86 +150,100 @@ hook_png = slide('s_hook', [('“Papa, mera accident ho gaya hai…', 70, FG, UN
 hook = still_clip('c_hook', hook_png, c_len + dur(n1) + 1.5, [(clone, 0.3, 1.0), (n1, c_len + 0.8, 1.0)])
 
 # ---------- 2. problem ----------
-n2 = tts('n_problem', "India lost over twenty two thousand crore rupees to cyber fraud in 2025. "
-                      "Every police and bank advisory says the same thing: don't trust the voice, call the person back. "
-                      "In a panic, nobody does. Voice Shield does it for you, through Alexa.", 'Aman')
+n2 = tts('n_problem', "India lost over twenty-two thousand crore rupees to cyber fraud in 2025. "
+                      "Every advisory says: don't trust the voice, call them back. In a panic, nobody does. Voice Shield does it, through Alexa.", 'narrator', rate='+12%')
 prob_png = slide('s_problem', [('₹22,495 crore', 120, RED, UNI, 20), ('lost to cyber fraud in India, 2025', 48, DIM, HEL, 80),
                                ('“Don\'t trust the voice. Call them back.”', 60, FG, UNI, 20),
                                ('— FBI, FTC, RBI, Indian police advisories', 36, DIM, UNI, 0)])
 prob = still_clip('c_problem', prob_png, dur(n2) + 1.2, [(n2, 0.4, 1.0)])
 
 # ---------- 3. live demo (screen recording) ----------
+# The recording is real-time; the spoken replies are longer than the gaps between clicks. Instead of letting audio drift,
+# the video holds (freezes) on each moment until its line has been spoken, so picture and voice stay in sync.
 SCREEN = os.path.join(V, 'screen.mp4')
 t0 = float(open(os.path.join(V, 't0.txt')).read())
 events = [{**e, 'rt': e['t'] - t0} for e in json.load(open(os.path.join(V, 'events.json')))]
-CUT_IN, CUT_OUT = 13.0, 62.0
-demo_len = CUT_OUT - CUT_IN
-lines = []  # (wav, start in demo clip, volume)
-spoken = set()
+CUT_IN, CUT_OUT = 6.0, 66.0
+lines, seen = [], set()  # (event time rel. CUT_IN, wav, text)
 for i, e in enumerate(events):
-    if not (CUT_IN <= e['rt'] <= CUT_OUT) or e['name'] not in ('speak', 'user'):
+    if not (CUT_IN <= e['rt'] <= CUT_OUT) or e['name'] not in ('speak', 'user') or (e['name'], e['text']) in seen:
         continue
-    key = (e['name'], e['text'])
-    if key in spoken:
-        continue
-    spoken.add(key)
+    seen.add((e['name'], e['text']))
     txt = e['text']
-    if e['name'] == 'user':
-        voice = 'Rishi'
-    else:
-        voice = 'Lekha' if any(w in txt for w in ('Saavdhaan', 'Chetavani', 'Theek hai')) else 'Tara'
-    wav = tts(f'l{i}', txt, voice, rate=185)
-    lines.append((wav, e['rt'] - CUT_IN, 1.0))
-# real call audio, quiet, under the Alexa lines (it was replayed from the real VoLTE capture)
-call = os.path.join(B, 'call.wav')
-run('ffmpeg', '-y', '-i', os.path.join(V, 'demo_input.wav'), '-ar', str(SR), '-ac', '2', call)
-AUDIO_START_RT = -4.5  # file playback began ~4.5 s before the recording (server ready -> window open -> 3 s)
-lines.append((call, max(0.0, AUDIO_START_RT - CUT_IN), 0.45))
+    if txt.startswith('Chetavani'):
+        continue  # the spoken verdict right before it already says it; keeps the video under 3 min
+    voice = 'papa' if e['name'] == 'user' else ('alexa_hi' if txt.startswith(('Saavdhaan', 'Theek hai')) else 'alexa_en')
+    lines.append((e['rt'] - CUT_IN, tts(f'l{i}', txt, voice, rate='+10%'), txt))
 
-caps = [(0, 9, caption('cap1', 'Audio: clones of my voice, captured from a REAL VoLTE call on the Oppo (scrcpy, no root)')),
-        (9, 22, caption('cap2', 'Voice layer: "suspicious" → Alexa warns in Hindi; user asks "is this call real?"', AMB)),
-        (22, 33, caption('cap3', 'Rohan\'s real phone (Telegram): “Kya aap abhi ye call kar rahe ho?” → he taps “Nahi, main nahi”', RED)),
-        (33, demo_len, caption('cap4', 'Family denies → ALERT: "This is a scam. Hang up, do not pay."', RED))]
+segs, starts, src, out, busy = [], [], 0.0, 0.0, 0.0  # segs: (src_a, src_b, out_len)
+for ev, wav, _ in lines:
+    if ev > src or busy > out:
+        L = max(ev - src, busy - out)
+        segs.append((src, max(ev, src), L)); out += L; src = max(ev, src)
+    starts.append(out)
+    busy = out + dur(wav) + 0.35
+end_src = CUT_OUT - CUT_IN
+L = max(end_src - src, busy - out + 1.0)
+segs.append((src, end_src, L)); out += L
+demo_len = out
+
+seg_files = []
+for k, (sa, sb, L) in enumerate(segs):
+    f = os.path.join(B, f'seg{k}.mp4'); real = max(sb - sa, 0.05)
+    run('ffmpeg', '-y', '-ss', f'{CUT_IN + sa:.3f}', '-t', f'{real:.3f}', '-i', SCREEN, '-vf',
+        f'crop=1560:878:180:232,scale=1920:1080,setsar=1,fps=30,tpad=stop_mode=clone:stop_duration={max(0, L - real) + 0.1:.3f}',
+        '-t', f'{L:.3f}', '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', f)
+    seg_files.append(f)
+seg_list = os.path.join(B, 'segs.txt')
+open(seg_list, 'w').write(''.join(f"file '{f}'\n" for f in seg_files))
+demo_v = os.path.join(B, 'demo_v.mp4')
+run('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', seg_list, '-c', 'copy', demo_v)
+
+def start_of(prefix):
+    return next(st for st, (_, _, t) in zip(starts, lines) if t.startswith(prefix))
+s_warn, s_ask, s_no = start_of('Saavdhaan'), start_of("Alexa, ask Rohan"), start_of('Rohan says')
+
+# real call audio (replayed from the real VoLTE capture) plays alone until Alexa first speaks
+call = os.path.join(B, 'call.wav')
+AUDIO_START_RT = -4.5  # file playback began ~4.5 s before the recording (server ready -> window open -> 3 s)
+run('ffmpeg', '-y', '-i', os.path.join(V, 'demo_input.wav'), '-ss', f'{CUT_IN - AUDIO_START_RT}', '-t', f'{max(0.5, s_warn - 0.3):.2f}',
+    '-af', 'afade=t=out:st=%.2f:d=0.6' % max(0, s_warn - 1.0), '-ar', str(SR), '-ac', '2', call)
+audio = [(call, 0.0, 0.8)] + [(wav, st, 1.0) for st, (_, wav, _) in zip(starts, lines)]
+
+caps = [(0, s_warn, caption('cap1', 'Audio: clones of my voice, captured from a REAL VoLTE call on the Oppo (scrcpy, no root)')),
+        (s_warn, s_ask, caption('cap2', 'Voice layer: "suspicious" → Alexa warns in Hindi; Papa asks "is this call real?"', AMB)),
+        (s_ask, s_no, caption('cap3', 'Rohan\'s real phone (Telegram): “Kya aap abhi ye call kar rahe ho?” → he taps “Nahi, main nahi”', RED)),
+        (s_no, demo_len, caption('cap4', 'Family denies → ALERT: "This is a scam. Hang up, do not pay."', RED))]
 demo = os.path.join(B, 'c_demo.mp4')
-inp = ['-ss', f'{CUT_IN}', '-t', f'{demo_len}', '-i', SCREEN]
-for _, _, p in caps:
-    inp += ['-i', p]
-inp += ['-i', os.path.join(V, 'telegram.png')]  # Rohan's real Telegram screen from this run
-for wav, _, _ in lines:
-    inp += ['-i', wav]
-# crop menu bar, tab strip, automation banner and dock; keep 16:9
-vf = ['[0]crop=1560:878:180:232,scale=1920:1080,setsar=1[v0]']
-for k, (a, b, _) in enumerate(caps):
-    vf.append(f"[v{k}][{k+1}]overlay=0:H-150:enable='between(t,{a},{b})'[v{k+1}]")
+inp = ['-i', demo_v] + sum((['-i', p] for _, _, p in caps), []) + ['-i', os.path.join(V, 'telegram.png')]
+inp += sum((['-i', w] for w, _, _ in audio), [])
+vf = []
+for k, (a0, b0, _) in enumerate(caps):
+    vf.append(f"[{'0' if k == 0 else f'v{k}'}][{k+1}]overlay=0:H-150:enable='between(t,{a0:.2f},{b0:.2f})'[v{k+1}]")
 TG = len(caps) + 1
-tg_in, tg_out = 37.5 - CUT_IN - 1, demo_len  # from the question until the end
 vf.append(f"[{TG}]scale=-2:900,pad=iw+12:ih+12:6:6:color=#2ec4ff[tg]")
-vf.append(f"[v{len(caps)}][tg]overlay=W-w-70:40:enable='between(t,{tg_in},{tg_out})'[vtg]")
+vf.append(f"[v{len(caps)}][tg]overlay=W-w-70:40:enable='between(t,{s_ask + 3:.2f},{demo_len:.2f})'[vtg]")
 na = len(caps) + 2
-af, labels = [], []
-for j, (_, start, vol) in enumerate(lines):
-    af.append(f'[{na+j}]volume={vol},adelay={int(start*1000)}|{int(start*1000)}[x{j}]')
-    labels.append(f'[x{j}]')
-af.append(f'{"".join(labels)}amix=inputs={len(labels)}:normalize=0,atrim=0:{demo_len}[aout]')
+af = [f'[{na+j}]volume={vol},adelay={int(st*1000)}|{int(st*1000)}[x{j}]' for j, (_, st, vol) in enumerate(audio)]
+af.append(f'{"".join(f"[x{j}]" for j in range(len(audio)))}amix=inputs={len(audio)}:normalize=0,apad,atrim=0:{demo_len:.2f}[aout]')
 run('ffmpeg', '-y', *inp, '-filter_complex', ';'.join(vf + af), '-map', '[vtg]', '-map', '[aout]',
-    '-r', '30', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-ar', str(SR), '-ac', '2', '-t', f'{demo_len}', demo)
+    '-r', '30', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-ar', str(SR), '-ac', '2', '-t', f'{demo_len:.2f}', demo)
 
 # ---------- 4. how ----------
-n4 = tts('n_how', "Here is how. Voice Shield captures both sides of a real SIM call from an Android phone, without root. "
-                  "A voice layer scores every four seconds for synthetic speech. A words layer transcribes on device and looks for scam pressure: "
-                  "urgent money, O T P, keep it secret. Both feed a self hosted M C P server, spec 2025 11 25, over streamable H T T P, "
-                  "which Alexa plus calls. And when the caller claims to be family, Alexa asks the real person, on their own phone.", 'Aman')
+n4 = tts('n_how', "How it works: we capture both sides of a real SIM call, without root. "
+                  "A voice layer scores synthetic speech; a words layer listens for scam pressure like urgent money or OTPs. "
+                  "Both feed a self-hosted MCP server that Alexa Plus calls. "
+                  "And when the caller claims to be family, Alexa asks the real person, on their own phone.", 'narrator', rate='+12%')
 how = still_clip('c_how', arch_slide('s_how'), dur(n4) + 1.0, [(n4, 0.4, 1.0)])
 
 # ---------- 5. honest numbers ----------
-n5 = tts('n_numbers', "We measured it on my own voice. On simulated phone codecs the detector catches the clones. "
-                      "But over a real phone call, played over the air, it falls to around forty percent error. "
-                      "So we designed around that: the voice score alone only says verify. "
-                      "Scam words, or a no from the real family member, raise the alert. A clone can copy a voice. It cannot press the button on my phone.", 'Aman')
+n5 = tts('n_numbers', "We tested on my own voice. On simulated codecs, clones are caught. "
+                      "Over a real phone call, accuracy collapses. So the voice score alone only says: verify. "
+                      "A clone can copy a voice. It cannot press the button on my phone.", 'narrator', rate='+12%')
 nums = still_clip('c_numbers', table_slide('s_numbers'), dur(n5) + 1.0, [(n5, 0.4, 1.0)])
 
 # ---------- 6. close ----------
-n6 = tts('n_close', "Voice Shield is open source under M I T, runs on a laptop today, and belongs inside every Echo tomorrow.", 'Aman')
+n6 = tts('n_close', "Voice Shield. Open source, runs on a laptop today, and belongs inside every Echo tomorrow.", 'narrator', rate='+10%')
 close_png = slide('s_close', [('Voice Shield', 110, FG, HEL, 30), ('“Alexa, is this really my son calling?”', 52, BLUE, UNI, 70),
                               ('github.com/shaunmortal/voice-shield', 48, FG, HEL, 20),
                               ('MIT · MCP 2025-11-25 · Streamable HTTP · Alexa+ track', 36, DIM, HEL, 0)])
