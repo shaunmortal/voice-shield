@@ -1,37 +1,77 @@
-# Voice Shield — "Alexa, is this really my son calling?"
+<div align="center">
 
-**Alexa+ track · Amazon Developer Hackathon 2026 · self-hosted MCP server (spec 2025-11-25, Streamable HTTP)**
+<img src="video/gallery/0_hero.png" width="100%" alt="Voice Shield: Alexa, is this really my son?" />
 
-**Demo video (2:53):** https://youtu.be/Lkfjvd8oUys
+# 🛡️ Voice Shield
 
-A scammer clones your voice from a 10-second Instagram clip, calls your father and says *"Papa, mera accident ho gaya, abhi ₹25,000 bhej do, kisi ko mat batana."* Voice Shield listens to the **real SIM call** on the phone, scores the voice for AI-generation, reads the conversation for scam pressure, and, the part no clone can beat, **asks the real son on his own phone: "Are you calling right now?"** Alexa+ then tells Papa what to do.
+### "Alexa, is this really my son calling?"
+An Alexa+ MCP add-on that checks live phone and WhatsApp calls, asks the real family member to confirm, and stops the payment before the money moves.
 
-> India reported ₹22,495 crore of cyber-fraud losses in 2025; "digital arrest" alone peaked at 1.24 lakh complaints in 2024. Every official advisory (FBI, FTC, RBI, Indian police) says the same thing: *don't trust the voice, call them back.* Voice Shield automates exactly that advice.
+**Amazon Developer Hackathon 2026 · Alexa+ track · Open Source**
 
-## What it does
+[![Demo video](https://img.shields.io/badge/▶%20Demo%20video-2%3A53-FF0000?logo=youtube&logoColor=white)](https://youtu.be/Lkfjvd8oUys)
+[![MCP](https://img.shields.io/badge/MCP-2025--11--25%20·%20Streamable%20HTTP-5A45FF)](server.py)
+[![Latency](https://img.shields.io/badge/round--trip-1--3%20ms%20(limit%20500%20ms)-2ea44f)](#ready-for-the-alexa-mcp-toolkit)
+[![Android](https://img.shields.io/badge/Android-real%20SIM%20%2B%20WhatsApp%20calls,%20no%20root-3DDC84?logo=android&logoColor=white)](#live-sim-call-capture-android-no-root)
+[![Claude](https://img.shields.io/badge/Claude-Opus%205.5-D97757)](content.py)
+[![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)](requirements.txt)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+</div>
+
+---
+
+A scammer clones your voice from a 10-second Instagram clip, calls your father and says *"Papa, mera accident ho gaya, abhi ₹25,000 bhej do, kisi ko mat batana."* Voice Shield listens to the **real call** on the phone, reads it for scam pressure, and, the part no clone can beat, **asks the real son on his own phone: "Are you calling right now?"** If Papa opens PhonePe or Google Pay during the call, it asks the son **before the money moves**. Alexa+ then tells Papa what to do, in Hindi.
+
+> 🇮🇳 India reported **₹22,495 crore** of cyber-fraud losses in 2025; "digital arrest" alone peaked at 1.24 lakh complaints in 2024. Every official advisory (FBI, FTC, RBI, Indian police) says the same thing: *don't trust the voice, call them back.* Voice Shield automates exactly that advice.
+
+## ✨ What it does
+
+| | |
+|---|---|
+| 📞 **Listens to the real call** | Both sides of a SIM (VoLTE) call, or the caller side of a WhatsApp call, from a stock Android phone over USB. No root, no app install. |
+| 🧠 **Three independent signals** | **Voice:** DF_Arena_500M anti-spoof. **Words:** on-device Whisper, then Claude classifies scam pressure (urgent money, OTP, secrecy, police threats). **Timing:** who speaks when; real people say "haan/hmm", a played clone never does. |
+| 👨‍👩‍👦 **Asks the real person** | `verify_with_family` sends "Are you calling right now? ✅/❌" to the son's Telegram. A clone can copy a voice; it cannot press his button. |
+| 💸 **Payment Guard** | A UPI app (PhonePe, Google Pay, Paytm, BHIM, Amazon Pay) opening during the call triggers that question automatically, before any money moves. |
+| 🗣️ **Alexa+ answers in Hindi** | 5 MCP tools; the official RBI / 1930 / cybercrime.gov.in steps are fixed text, never generated. |
+| ⚖️ **Honest by design** | Voice scores fail on real WhatsApp calls (we measured ≈59 % EER), so **audio alone never raises an alert**; it only says "verify". |
+
+## 🖼️ Screens
+
+<table>
+<tr>
+<td width="50%"><img src="video/gallery/7_payment_guard.png" alt="Payment Guard real run" /><br/><sub><b>Payment Guard, real run:</b> PhonePe opens during the call → son asked on Telegram → "No" → alert</sub></td>
+<td width="50%"><img src="video/gallery/2_family_says_no.png" alt="Family says no" /><br/><sub><b>The real son taps "No"</b> on his own phone; the call becomes an alert</sub></td>
+</tr>
+<tr>
+<td><img src="video/gallery/2b_alexa_hindi_mcp.png" alt="Alexa in Hindi" /><br/><sub><b>Claude as Alexa+</b> calls <code>get_call_status</code> over MCP and answers in Hindi</sub></td>
+<td><img src="video/gallery/6_claude_code_mcp.png" alt="Claude Code calling the MCP server" /><br/><sub><b>Claude Code</b> calling the same MCP server (real run)</sub></td>
+</tr>
+<tr>
+<td><img src="video/gallery/4_real_call_numbers.png" alt="Real call numbers" /><br/><sub><b>Measured on real calls:</b> the voice detector fails on WhatsApp</sub></td>
+<td><img src="video/gallery/5_timing.png" alt="Timing layer" /><br/><sub><b>Timing layer:</b> 7 backchannels from the real friend, 0 from his clone</sub></td>
+</tr>
+</table>
+
+## 🧭 How it works
+
+```mermaid
+flowchart LR
+  A["📞 Papa's phone<br/>SIM or WhatsApp call"] -->|scrcpy audio, no root| B["🎧 Voice Shield engine"]
+  A -->|adb: UPI app opened?| G["💸 Payment Guard"]
+  B --> V["Voice<br/>DF_Arena_500M"]
+  B --> W["Words<br/>Whisper → Claude"]
+  B --> T["Timing<br/>reply gap, haan/hmm"]
+  V & W & T --> F{"Fusion<br/>audio alone ≤ suspicious"}
+  G --> Q["📱 Telegram to the real son<br/>Are you calling? ✅/❌"]
+  F --> M["MCP server /mcp<br/>2025-11-25, Streamable HTTP"]
+  Q --> M
+  M --> X["🔊 Alexa+ (simulated client)<br/>Claude Code · any MCP client"]
 ```
- 📞 live SIM call (Oppo, no root)     🎙️ laptop mic / 📁 clip
-          └──────── 16 kHz PCM via ffmpeg ────────┘
-                           │
-        ┌──────────────────┼──────────────────────┐
-  Layer 1: voice      Layer 2: words        Layer 0: caller
-  DF_Arena_500M       scam-pressure         metadata (unknown /
-  anti-spoof, 4 s     classifier (Bedrock   international number)
-  windows, 3-of-5     Nova Micro or
-  consensus           offline keywords)
-        └──────────────────┼──────────────────────┘
-                           ▼
-                 MCP server  /mcp  (4 tools)
-                           ▼
-    Alexa+ (simulated web client, speaks Hindi/English)
-                           ▼
-  Layer 3: verify_with_family → Telegram "Are you calling?" ✅/❌
-```
 
-**Fusion rule (`engine.fuse`):** words risk ≥ 0.6 → alert; words ≥ 0.3 *and* voice alert → alert; voice alone → at most suspicious. A human decides via `verify_with_family`. The voice score alone never tells the user to hang up; it tells them to verify.
+**Fusion rule (`engine.fuse`):** family says No → alert; words risk ≥ 0.6 → alert; words ≥ 0.3 *and* voice alert or bot-like timing → alert; voice alone → at most suspicious. A human decides via `verify_with_family`. The voice score alone never tells the user to hang up; it tells them to verify.
 
-## MCP tools
+## 🔧 MCP tools
 
 | Tool | Returns | Alexa+ use |
 |---|---|---|
