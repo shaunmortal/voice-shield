@@ -44,6 +44,7 @@ class Turns:
         self.waiting_since = None   # user finished a real turn at this time, caller has not replied yet
         self.gaps = []              # caller reply latencies (s)
         self.backchannels = 0       # caller spurts < BACKCHANNEL_MAX_S while the user is talking
+        self.bc_at_reply = []       # backchannel count when each reply arrived (for the recent window)
         self.user_turns = 0
 
     def push(self, user_frame, caller_frame):
@@ -55,15 +56,20 @@ class Turns:
             self.waiting_since = u_end[1]
         if c_voiced and self.waiting_since is not None and not self.user.talking:
             self.gaps.append(self.t - self.waiting_since)
+            self.bc_at_reply.append(self.backchannels)
             self.waiting_since = None
         if c_end and self.user.talking and c_end[1] - c_end[0] <= BACKCHANNEL_MAX_S:
             self.backchannels += 1
 
-    def summary(self):
+    def summary(self, window=4):
         g = np.array(self.gaps)
         median = float(np.median(g)) if len(g) else None
-        # ponytail: hand-set thresholds from published human vs voice-agent medians; refit on recorded calls
-        bot_like = bool(len(g) >= 3 and median > 1.0 and self.backchannels == 0)
+        # Judge the last `window` replies only: a call can start human and turn scripted (or the reverse).
+        recent = g[-window:]
+        recent_bc = self.backchannels - (self.bc_at_reply[-window - 1] if len(self.bc_at_reply) > window else 0)
+        # ponytail: hand-set thresholds from published human (~0.2 s) vs voice-agent (1.3-3.8 s) medians;
+        # WhatsApp adds ~0.3-0.5 s each way, so 1.0 s; refit on recorded calls
+        bot_like = bool(len(recent) >= 3 and np.median(recent) > 1.0 and recent_bc == 0)
         return {'replies': len(g), 'median_gap_s': None if median is None else round(float(median), 2),
                 'gaps_s': [round(float(x), 2) for x in g[-8:]], 'backchannels': self.backchannels,
                 'user_turns': self.user_turns, 'bot_like': bot_like}
@@ -89,6 +95,20 @@ if __name__ == '__main__':
         return tt.summary()
 
     human, bot = simulate(0.25, True), simulate(2.5, False)
+    # a call that starts human and turns scripted must be caught by the recent window
+    tt = Turns()
+    for gap_s, bc in [(0.25, True)] * 4 + [(2.5, False)] * 4:
+        for k in range(100):
+            tt.push(speech(), speech() if bc and 40 <= k < 55 else quiet())
+        for _ in range(int(gap_s / FRAME_S)):
+            tt.push(quiet(), quiet())
+        for _ in range(100):
+            tt.push(quiet(), speech())
+        for _ in range(20):
+            tt.push(quiet(), quiet())
+    mixed = tt.summary()
+    print('mixed', mixed)
+    assert mixed['bot_like'], mixed
     print('human', human); print('bot  ', bot)
     assert not human['bot_like'] and human['backchannels'] >= 3
     assert bot['bot_like'] and 2.0 < bot['median_gap_s'] < 3.2, bot

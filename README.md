@@ -88,6 +88,12 @@ Read these honestly:
 - `ffmpeg loudnorm` on the real recordings turned them "synthetic" (logit margin −11 → +4.6). Static gain only. Details in `docs/friction_log.md`.
 - Latency on M1 (8 GB): ~230 ms per 4 s window on MPS, 1 s hop → first alert 3–5 s after cloned speech starts.
 
+## Timing layer (who speaks when)
+
+`turns.py` pairs the caller's audio (Oppo, `scrcpy --audio-source=playback --audio-dup` during a WhatsApp call) with the user's voice (laptop mic) in 20 ms frames and tracks the caller's reply gap after each user turn and the "haan / hmm" backchannels the caller makes while the user talks. Humans reply in ≈0.2 s and backchannel constantly (Stivers et al. 2009); production AI voice agents reply in 1.3-3.8 s and almost never backchannel (Cekura 2026, Full-Duplex-Bench 2025).
+
+Live WhatsApp call with a consenting friend, 8 questions: while he answered himself he backchannelled 7 times and the median reply gap was 0.6-0.8 s (WhatsApp adds network delay); when he answered by playing his own clone, like a scammer pressing play, backchannels stayed at zero and the median gap rose to 1.1 s. The first version averaged the whole call, so the human half masked the scripted half and no "bot-like" flag fired; it now judges the last 4 replies (`turns.py` self-test covers a human-then-bot call). One call, one speaker: indicative only.
+
 ## Privacy
 
 Audio is processed on the laptop and discarded after each window; only aggregate risk events are kept. The remote caller's voice is personal data under India's DPDP Act, so no audio is uploaded; the optional Bedrock call receives transcript text only. The clone test set was made from the author's own voice with consent; we declined services that required publishing the voice model.

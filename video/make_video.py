@@ -62,24 +62,25 @@ def slide(name, lines):
 def table_slide(name):
     im = Image.new('RGB', (W, H), BG)
     d = ImageDraw.Draw(im)
-    d.text((160, 110), 'Measured on my own voice', font=font(64), fill=FG)
+    d.text((160, 110), 'Measured on real voices (mine and a friend\'s, with consent)', font=font(56), fill=FG)
     d.text((160, 195), 'clones: F5-TTS + Chatterbox (Hindi + English) · detector: DF_Arena_500M', font=font(34), fill=DIM)
     rows = [('Channel', 'EER', 'Clones caught @1% false alarms', FG),
             ('Clean 16 kHz', '0.0 %', '100 %', GRN),
             ('G.711 landline codec', '1.2 %', '90 %', GRN),
             ('Opus narrowband', '8.9 %', '80 %', AMB),
-            ('REAL VoLTE call, over the air', '≈ 35-40 %', '0 %', RED)]
+            ('REAL VoLTE call (loudspeaker replay)', '≈ 35-40 %', '0 %', RED),
+            ('REAL WhatsApp call, live voice vs clone', '≈ 59 %', '7 %', RED)]
     y = 310
     for i, (a, b, c, col) in enumerate(rows):
         f = font(44 if i else 36)
         d.text((160, y), a, font=f, fill=col if i else DIM)
         d.text((980, y), b, font=f, fill=col if i else DIM)
         d.text((1270, y), c, font=f, fill=col if i else DIM)
-        y += 95
+        y += 80
         if i == 0:
             d.line((160, y - 20, 1760, y - 20), fill='#2a3442', width=2)
-    d.text((160, y + 40), 'So the voice score never decides alone: it only says "verify".', font=font(44), fill=FG)
-    d.text((160, y + 110), 'Scam words, or a “No” from the real family member, raise the alert.', font=font(44, UNI), fill=FG)
+    d.text((160, y + 30), 'Real calls break voice-artifact detection (WhatsApp\'s noise suppression makes real voices look fake).', font=font(34), fill=FG)
+    d.text((160, y + 90), 'So the voice score only says "verify". Scam words, bot-like timing or the family\'s “No” raise the alert.', font=font(34, UNI), fill=FG)
     p = os.path.join(B, name + '.png')
     im.save(p)
     return p
@@ -150,8 +151,8 @@ hook_png = slide('s_hook', [('“Papa, mera accident ho gaya hai…', 70, FG, UN
 hook = still_clip('c_hook', hook_png, c_len + dur(n1) + 1.5, [(clone, 0.3, 1.0), (n1, c_len + 0.8, 1.0)])
 
 # ---------- 2. problem ----------
-n2 = tts('n_problem', "India lost over twenty-two thousand crore rupees to cyber fraud in 2025. "
-                      "Every advisory says: don't trust the voice, call them back. In a panic, nobody does. Voice Shield does it, through Alexa.", 'narrator', rate='+12%')
+n2 = tts('n_problem', "India lost twenty-two thousand crore rupees to cyber fraud in 2025. "
+                      "Every advisory says: call them back. In a panic, nobody does. Voice Shield does, through Alexa.", 'narrator', rate='+15%')
 prob_png = slide('s_problem', [('₹22,495 crore', 120, RED, UNI, 20), ('lost to cyber fraud in India, 2025', 48, DIM, HEL, 80),
                                ('“Don\'t trust the voice. Call them back.”', 60, FG, UNI, 20),
                                ('— FBI, FTC, RBI, Indian police advisories', 36, DIM, UNI, 0)])
@@ -163,7 +164,7 @@ prob = still_clip('c_problem', prob_png, dur(n2) + 1.2, [(n2, 0.4, 1.0)])
 SCREEN = os.path.join(V, 'screen.mp4')
 t0 = float(open(os.path.join(V, 't0.txt')).read())
 events = [{**e, 'rt': e['t'] - t0} for e in json.load(open(os.path.join(V, 'events.json')))]
-CUT_IN, CUT_OUT = 6.0, 66.0
+CUT_IN, CUT_OUT = 6.0, 58.0
 lines, seen = [], set()  # (event time rel. CUT_IN, wav, text)
 for i, e in enumerate(events):
     if not (CUT_IN <= e['rt'] <= CUT_OUT) or e['name'] not in ('speak', 'user') or (e['name'], e['text']) in seen:
@@ -237,24 +238,48 @@ n4 = tts('n_how', "How it works: we capture both sides of a real SIM call, witho
 how = still_clip('c_how', arch_slide('s_how'), dur(n4) + 1.0, [(n4, 0.4, 1.0)])
 
 # ---------- 5. honest numbers ----------
-n5 = tts('n_numbers', "We tested on my own voice. On simulated codecs, clones are caught. "
-                      "Over a real phone call, accuracy collapses. So the voice score alone only says: verify. "
-                      "A clone can copy a voice. It cannot press the button on my phone.", 'narrator', rate='+12%')
+n5 = tts('n_numbers', "We measured it honestly. On simulated codecs, clones are caught. On real calls, including a live WhatsApp call, "
+                      "the voice detector fails, because WhatsApp's own processing makes real voices look synthetic. "
+                      "So the voice score alone only says: verify.", 'narrator', rate='+12%')
 nums = still_clip('c_numbers', table_slide('s_numbers'), dur(n5) + 1.0, [(n5, 0.4, 1.0)])
 
+# ---------- 5b. timing (live WhatsApp call with a consenting friend) ----------
+def timing_slide(name):
+    im = Image.new('RGB', (W, H), BG)
+    d = ImageDraw.Draw(im)
+    d.text((160, 110), 'Who speaks when survives any phone line', font=font(60), fill=FG)
+    d.text((160, 195), 'Live WhatsApp call with a friend · caller audio from the phone, my voice from the laptop mic', font=font(32), fill=DIM)
+    rows = [('', 'Human answering', 'Clone played as replies', DIM),
+            ('“haan / hmm” while I talk', '7', '0', FG),
+            ('Median reply gap', '0.6 - 0.8 s', 'rose to 1.1 s', FG),
+            ('Typical (research)', '≈ 0.2 s', '1.3 - 3.8 s (AI voice agents)', DIM)]
+    y = 320
+    for a, b, c, col in rows:
+        f = font(44 if col == FG else 34)
+        d.text((160, y), a, font=f, fill=col); d.text((900, y), b, font=f, fill=GRN if col == FG else col)
+        d.text((1300, y), c, font=f, fill=RED if col == FG else col); y += 100
+    d.text((160, y + 30), 'turns.py judges the last 4 replies: slow replies + no backchannels = bot-like.', font=font(36), fill=FG)
+    d.text((160, y + 90), 'One call, one speaker: indicative, not a benchmark.', font=font(32), fill=DIM)
+    p = os.path.join(B, name + '.png'); im.save(p); return p
+
+n7 = tts('n_timing', "A second signal survives any phone line: timing. On a live WhatsApp call, my friend answered within a second and said "
+                     "haan and hmm seven times while I spoke. When he replied with his clone, like a scammer pressing play, "
+                     "the backchannels stopped and the reply gap grew.", 'narrator', rate='+12%')
+timing = still_clip('c_timing', timing_slide('s_timing'), dur(n7) + 0.8, [(n7, 0.3, 1.0)])
+
 # ---------- 6. close ----------
-n6 = tts('n_close', "Voice Shield. Open source, runs on a laptop today, and belongs inside every Echo tomorrow.", 'narrator', rate='+10%')
+n6 = tts('n_close', "Voice Shield. Open source, and built for every Echo.", 'narrator', rate='+10%')
 close_png = slide('s_close', [('Voice Shield', 110, FG, HEL, 30), ('“Alexa, is this really my son calling?”', 52, BLUE, UNI, 70),
                               ('github.com/shaunmortal/voice-shield', 48, FG, HEL, 20),
                               ('MIT · MCP 2025-11-25 · Streamable HTTP · Alexa+ track', 36, DIM, HEL, 0)])
-close = still_clip('c_close', close_png, dur(n6) + 2.0, [(n6, 0.4, 1.0)])
+close = still_clip('c_close', close_png, dur(n6) + 1.2, [(n6, 0.3, 1.0)])
 
 # ---------- concat ----------
 lst = os.path.join(B, 'list.txt')
 with open(lst, 'w') as f:
-    for c in (hook, prob, demo, how, nums, close):
+    for c in (hook, prob, demo, how, nums, timing, close):
         f.write(f"file '{c}'\n")
 out = os.path.join(V, 'voice_shield_demo.mp4')
 run('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', lst, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-r', '30',
     '-c:a', 'aac', '-ar', str(SR), '-ac', '2', '-movflags', '+faststart', out)
-print(f'{out}  {dur(out):.1f}s  (hook {dur(hook):.0f}, problem {dur(prob):.0f}, demo {dur(demo):.0f}, how {dur(how):.0f}, numbers {dur(nums):.0f}, close {dur(close):.0f})')
+print(f'{out}  {dur(out):.1f}s  (hook {dur(hook):.0f}, problem {dur(prob):.0f}, demo {dur(demo):.0f}, how {dur(how):.0f}, numbers {dur(nums):.0f}, timing {dur(timing):.0f}, close {dur(close):.0f})')
