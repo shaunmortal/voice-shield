@@ -22,8 +22,8 @@ Transcript:
 # ponytail: keyword fallback with hand-tuned weights; Bedrock is the real classifier
 _RULES = {
     'urgency': r'abhi|turant|jaldi|right now|immediately|urgent|अभी|जल्दी|तुरंत',
-    'secrecy': r'kisi ko mat|mat batana|don.t tell|secret|किसी को मत|मत बताना|phone mat kaat|फोन मत काट',
-    'payment_request': r'bhej do|bhejo|transfer|paise|rupay|hazaar|lakh|send (the )?money|google pay|upi|भेज|पैसे|हज़ार|लाख',
+    'secrecy': r'kisi ko mat|mat batana|do ?n.?t tell|do not tell|tell no ?one|secret|किसी को मत|मत बताना|phone mat kaat|फोन मत काट',
+    'payment_request': r'bhej do|bhejo|transfer|paise|rupay|rupee|hazaar|thousand|lakh|send (the )?money|google pay|upi|भेज|पैसे|हज़ार|लाख',
     'impersonation': r'bank se|police|cbi|cyber crime|inspector|customs|kyc|otp|cvv|पुलिस|बैंक|ओटीपी|इंस्पेक्टर',
 }
 _TACTIC = [('family_emergency', r'accident|hospital|thane|jail|एक्सीडेंट|थाने|अस्पताल'),
@@ -75,4 +75,5 @@ if __name__ == '__main__':
         c = classify(s); print(f"{c['risk']:.2f} {c['tactic']:17s} {s[:50]}")
     assert classify('abhi paise bhej do kisi ko mat batana, accident ho gaya')['risk'] >= 0.6
     assert classify('aaj college mein exam tha')['risk'] < 0.3
+    assert classify('Papa, I had an accident. Please send twenty five thousand rupees right now. Do not tell anyone.')['risk'] >= 0.6
     print('ok')

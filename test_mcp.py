@@ -31,6 +31,7 @@ try:
     for i in range(20):
         levels.append(rpc('tools/call', {'name': 'get_call_status', 'arguments': {}}, id=10 + i, headers=h)['structuredContent']['level'])
         if levels[-1] == 'alert': break
+        if i == 19: print(rpc('tools/call', {'name': 'get_call_status', 'arguments': {}}, id=98, headers=h)['structuredContent'])
         time.sleep(1)
     assert levels[-1] == 'alert', levels
     hist = rpc('tools/call', {'name': 'get_alert_history', 'arguments': {}}, id=99, headers=h)['structuredContent']

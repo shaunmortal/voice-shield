@@ -27,7 +27,7 @@ A scammer clones your voice from a 10-second Instagram clip, calls your father a
   Layer 3: verify_with_family → Telegram "Are you calling?" ✅/❌
 ```
 
-**Fusion rule:** words and metadata gate, the voice score boosts, a human decides. The voice score alone never tells the user to hang up; it tells them to verify.
+**Fusion rule (`engine.fuse`):** words risk ≥ 0.6 → alert; words ≥ 0.3 *and* voice alert → alert; voice alone → at most suspicious. A human decides via `verify_with_family`. The voice score alone never tells the user to hang up; it tells them to verify.
 
 ## MCP tools
 
@@ -71,11 +71,11 @@ Test set: one consenting team member's voice (bona fide, 4 recordings, 512 four-
 | Band-limited 300–3400 Hz | 0.8 % | 90 % | — |
 | G.711 µ-law (landline) | 1.2 % | 90 % | 0 / 4 |
 | Opus narrowband 12 kb/s | **8.9 %** | 80 % | **3 / 4** |
-| Real VoLTE call (recorded through the phone) | see `data/realcall` when present | | |
+| **Real VoLTE call** (laptop speaker → friend's phone → Jio/Airtel network → our Oppo, captured by scrcpy) | **≈ 35–40 %** | 0 % | 2 / 3 (audio alone) |
 
 Read these honestly:
-- Clones from the two tools we tried are caught in every condition (mean score 0.93–0.96).
-- The failure mode is **false alarms on real people over narrowband codecs**, not missed clones. That is why audio never decides alone.
+- **On simulated codecs the detector works; on a real phone call it does not.** Played over the air into a real call, clone scores fell from 0.95 to ≈0.45 and real speech rose to ≈0.30, so the two overlap. This matches the literature (SAFE 2025: over-the-air re-recording is the most damaging condition) and it is the most important number in this README.
+- So the design does not trust audio: **the voice layer alone can only raise "suspicious" ("verify this caller"), never "alert".** An alert needs scam language in the live transcript (Whisper on-device → scam classifier) or a ❌ from the real family member. Both of those work identically on a bad phone line, because a clone can copy a voice but not the script it must say or the button on the real son's phone.
 - Two clone families are *seen* only in the sense that we chose the calibration on them; the model was not trained on them. Published results for unseen 2024-era generators are 25–33 % EER and 40–50 % on multilingual in-the-wild sets that include Hindi ([Deepfake-Eval-2024](https://arxiv.org/abs/2503.02857), [ML-ITW](https://arxiv.org/abs/2603.05852)). Real-time voice conversion (RVC/Seed-VC) was not tested.
 - Model swap evidence: NII AntiDeepfake-Small (ported without fairseq in `antideepfake.py`) scored our own voice 0.00 but **missed** the F5 clones (0.02–0.47); DF_Arena_500M caught them all, so it is the live model.
 - `ffmpeg loudnorm` on the real recordings turned them "synthetic" (logit margin −11 → +4.6). Static gain only. Details in `docs/friction_log.md`.

@@ -8,5 +8,6 @@ einops==0.8.2
 soundfile==0.14.0
 numpy==2.5.4
 huggingface-hub
+mlx-whisper  # on-device transcript (Apple Silicon); words layer is skipped if absent
 # optional: Bedrock words layer
 boto3
