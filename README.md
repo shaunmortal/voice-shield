@@ -17,6 +17,10 @@ An Alexa+ MCP add-on that checks live phone and WhatsApp calls, asks the real fa
 [![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)](requirements.txt)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+### ▶️ [Watch the 2:52 demo video](https://youtu.be/Cp8WuCeaHMY)
+
+[![Voice Shield demo video](https://img.youtube.com/vi/Cp8WuCeaHMY/hqdefault.jpg)](https://youtu.be/Cp8WuCeaHMY)
+
 </div>
 
 ---
