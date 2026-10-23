@@ -120,9 +120,11 @@ Alexa+ add-on tools are partner-only, so we could not deploy, but the server is 
 | Structured results | `structuredContent` plus a text block; read-only tools annotated |
 
 ## 💸 Payment Guard: stop the scam at the payment
-A scam ends at the payment, not at the call. While a call is on (and for 5 minutes after it), Voice Shield watches which app is open on the parent's phone over adb, no root. The moment PhonePe, Google Pay, Paytm, BHIM or Amazon Pay opens, it asks the real son on Telegram by itself, before any money moves: "Papa ne call ke dauraan abhi PhonePe khola hai, paise bhejne wale hain. Kya aap abhi ye call kar rahe ho?" His "No" turns the call into an alert, and `get_call_status` tells Alexa+ to say "wait, your family member is confirming". No voice score is involved, so it works however perfect the clone is. Real run on the Oppo F25 Pro: call started 23:39:12, PhonePe opened 23:39:30 and the question went out the same second, "No" arrived 23:40:00 (`payguard.py`).
+A scam ends at the payment, not at the call. While a call is on (and for 5 minutes after it), Voice Shield watches which app is open on the parent's phone over adb, no root. The moment PhonePe, Google Pay, Paytm, BHIM or Amazon Pay opens, it asks the real son on Telegram by itself, before any money moves: "Papa ne call ke dauraan abhi PhonePe khola hai, paise bhejne wale hain. Kya aap abhi ye call kar rahe ho?" His "No" turns the call into an alert, and `get_call_status` tells Alexa+ to say "wait, your family member is confirming". No voice score is involved, so it works however perfect the clone is. Real run on the Oppo F25 Pro: call started 23:39:12, PhonePe opened 23:39:30 and the question went out the same second, "No" arrived 23:40:00 (`payguard.py`). When it fires, Voice Shield also intervenes on the spot: it says "Ruko! Paise mat bhejiye" aloud in the room (the Alexa+ announcement) and pins the same warning as a notification on the parent's phone; after the son's "No" the notification turns into "SCAM! Phone kaat dijiye". Second live run: PhonePe opened 23:54:59, "No" 23:55:13, both warnings on the phone (screenshots in the gallery).
 
 ![Payment Guard real run](video/gallery/7_payment_guard.png)
+
+![Payment Guard on the phone](video/gallery/8_payment_guard_phone.png)
 
 ## 📊 The numbers (measured, our own voice)
 

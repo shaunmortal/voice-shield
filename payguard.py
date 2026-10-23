@@ -18,6 +18,9 @@ UPI_APPS = {
     'in.org.npci.upiapp': 'BHIM',
     'in.amazon.mShop.android.shopping': 'Amazon Pay',
 }
+WARN = 'Ruko! Paise mat bhejiye. {person} se pehle confirm kar rahe hain.'
+SCAM = 'SCAM! {person} ne kaha wo call nahi kar rahe. Phone kaat dijiye, paise mat bhejiye.'
+SAFE = '{person} ne confirm kiya, call asli hai.'
 AFTER_CALL_S = 300   # scammers keep the parent on the line, or call back, so the window outlives the call
 POLL_S = 1.5
 
@@ -36,6 +39,24 @@ def foreground(dump):
 
 def in_call(dump):
     return any(int(x) != 0 for x in re.findall(r'mCallState=(\d)', dump))
+
+
+def _speak(text):
+    """Same natural voice as the Alexa+ page (Edge neural TTS); macOS 'say' only if offline."""
+    import asyncio, tempfile
+    try:
+        import edge_tts
+        out = tempfile.mktemp(suffix='.mp3')
+        asyncio.run(edge_tts.Communicate(text, 'en-IN-NeerjaExpressiveNeural', rate='+5%').save(out))
+        subprocess.run(['afplay', out])
+    except Exception:
+        subprocess.run(['say', '-v', 'Lekha', text])
+
+
+def intervene(text):
+    """Speak it in the room (stand-in for an Alexa+ announcement) and pin it on the parent's phone, both at once."""
+    threading.Thread(target=_speak, args=(text,), daemon=True).start()
+    _adb('cmd', 'notification', 'post', '-S', 'bigtext', '-t', "'Voice Shield'", 'voiceshield', f"'{text}'")
 
 
 class PayGuard:
@@ -65,9 +86,12 @@ class PayGuard:
             time.sleep(POLL_S)
 
     def _ask(self, app):
+        intervene(WARN.format(person=self.person))
         v = verify.verify(self.person, f'Papa ne call ke dauraan abhi {app} khola hai, paise bhejne wale hain')
         self.state = {**self.state, 'family': v['answer']}
         self.shield.set_family(v['answer'])
+        if v['answer'] in ('yes', 'no'):
+            intervene((SAFE if v['answer'] == 'yes' else SCAM).format(person=self.person))
 
 
 assert foreground('  topResumedActivity=ActivityRecord{1 u0 com.phonepe.app/.ui.MainActivity t5}') == 'com.phonepe.app'
