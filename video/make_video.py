@@ -164,14 +164,14 @@ prob = still_clip('c_problem', prob_png, dur(n2) + 1.2, [(n2, 0.4, 1.0)])
 SCREEN = os.path.join(V, 'screen.mp4')
 t0 = float(open(os.path.join(V, 't0.txt')).read())
 events = [{**e, 'rt': e['t'] - t0} for e in json.load(open(os.path.join(V, 'events.json')))]
-CUT_IN, CUT_OUT = 6.0, 58.0
+CUT_IN, CUT_OUT = 10.0, 58.0
 lines, seen = [], set()  # (event time rel. CUT_IN, wav, text)
 for i, e in enumerate(events):
     if not (CUT_IN <= e['rt'] <= CUT_OUT) or e['name'] not in ('speak', 'user') or (e['name'], e['text']) in seen:
         continue
     seen.add((e['name'], e['text']))
     txt = e['text']
-    if txt.startswith('Chetavani'):
+    if txt.startswith(('Chetavani', 'Alexa, is this call real', 'Some parts of the caller voice')):
         continue  # the spoken verdict right before it already says it; keeps the video under 3 min
     voice = 'papa' if e['name'] == 'user' else ('alexa_hi' if txt.startswith(('Saavdhaan', 'Theek hai')) else 'alexa_en')
     lines.append((e['rt'] - CUT_IN, tts(f'l{i}', txt, voice, rate='+10%'), txt))
@@ -212,7 +212,7 @@ run('ffmpeg', '-y', '-i', os.path.join(V, 'demo_input.wav'), '-ss', f'{CUT_IN - 
 audio = [(call, 0.0, 0.8)] + [(wav, st, 1.0) for st, (_, wav, _) in zip(starts, lines)]
 
 caps = [(0, s_warn, caption('cap1', 'Audio: clones of my voice, captured from a REAL VoLTE call on the Oppo (scrcpy, no root)')),
-        (s_warn, s_ask, caption('cap2', 'Voice layer: "suspicious" → Alexa warns in Hindi; Papa asks "is this call real?"', AMB)),
+        (s_warn, s_ask, caption('cap2', 'Voice sounds partly synthetic → Alexa warns in Hindi: "verify before you pay"', AMB)),
         (s_ask, s_no, caption('cap3', 'Rohan\'s real phone (Telegram): “Kya aap abhi ye call kar rahe ho?” → he taps “Nahi, main nahi”', RED)),
         (s_no, demo_len, caption('cap4', 'Family denies → ALERT: "This is a scam. Hang up, do not pay."', RED))]
 demo = os.path.join(B, 'c_demo.mp4')
@@ -230,11 +230,25 @@ af.append(f'{"".join(f"[x{j}]" for j in range(len(audio)))}amix=inputs={len(audi
 run('ffmpeg', '-y', *inp, '-filter_complex', ';'.join(vf + af), '-map', '[vtg]', '-map', '[aout]',
     '-r', '30', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-ar', str(SR), '-ac', '2', '-t', f'{demo_len:.2f}', demo)
 
+# ---------- 3b. talking to Alexa (Claude agent over MCP), real mic audio ----------
+ALEXA = os.path.join(V, 'alexa_screen.mp4')
+parts = [(3.0, 9.0, 'Papa asks by voice, in Hindi'), (17.5, 30.0, 'Claude, acting as Alexa+, called get_call_status over MCP'),
+         (30.5, 35.5, '"Alexa, I already sent ₹10,000"'), (45.5, 63.0, 'what_should_i_do → RBI / 1930 steps, in Hindi')]
+seg_files = []
+for k, (a0, b0, cap) in enumerate(parts):
+    f = os.path.join(B, f'al{k}.mp4'); cp = caption(f'alcap{k}', cap, BLUE)
+    run('ffmpeg', '-y', '-ss', f'{a0}', '-t', f'{b0 - a0}', '-i', ALEXA, '-i', cp, '-filter_complex',
+        '[0:v]crop=1560:878:180:232,scale=1920:1080,setsar=1,fps=30[v];[v][1]overlay=0:H-150[vo];'
+        '[0:a]aresample=48000,volume=1.6,afade=t=in:d=0.15,afade=t=out:st=%.2f:d=0.25[ao]' % (b0 - a0 - 0.3),
+        '-map', '[vo]', '-map', '[ao]', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-ar', str(SR), '-ac', '2', f)
+    seg_files.append(f)
+al_list = os.path.join(B, 'al.txt'); open(al_list, 'w').write(''.join(f"file '{f}'\n" for f in seg_files))
+alexa = os.path.join(B, 'c_alexa.mp4')
+run('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', al_list, '-c', 'copy', alexa)
+
 # ---------- 4. how ----------
-n4 = tts('n_how', "How it works: we capture both sides of a real SIM call, without root. "
-                  "A voice layer scores synthetic speech; a words layer listens for scam pressure like urgent money or OTPs. "
-                  "Both feed a self-hosted MCP server that Alexa Plus calls. "
-                  "And when the caller claims to be family, Alexa asks the real person, on their own phone.", 'narrator', rate='+12%')
+n4 = tts('n_how', "Under the hood: real SIM and WhatsApp call audio from an Android phone, no root. "
+                  "Voice, words and timing layers feed a self-hosted MCP server, and any assistant, here Claude standing in for Alexa Plus, calls its tools.", 'narrator', rate='+12%')
 how = still_clip('c_how', arch_slide('s_how'), dur(n4) + 1.0, [(n4, 0.4, 1.0)])
 
 # ---------- 5. honest numbers ----------
@@ -262,9 +276,8 @@ def timing_slide(name):
     d.text((160, y + 90), 'One call, one speaker: indicative, not a benchmark.', font=font(32), fill=DIM)
     p = os.path.join(B, name + '.png'); im.save(p); return p
 
-n7 = tts('n_timing', "A second signal survives any phone line: timing. On a live WhatsApp call, my friend answered within a second and said "
-                     "haan and hmm seven times while I spoke. When he replied with his clone, like a scammer pressing play, "
-                     "the backchannels stopped and the reply gap grew.", 'narrator', rate='+12%')
+n7 = tts('n_timing', "Timing survives any phone line. Live, my friend said haan and hmm seven times. "
+                     "Replying with his clone, like a scammer pressing play: zero, and slower replies.", 'narrator', rate='+12%')
 timing = still_clip('c_timing', timing_slide('s_timing'), dur(n7) + 0.8, [(n7, 0.3, 1.0)])
 
 # ---------- 6. close ----------
@@ -277,9 +290,9 @@ close = still_clip('c_close', close_png, dur(n6) + 1.2, [(n6, 0.3, 1.0)])
 # ---------- concat ----------
 lst = os.path.join(B, 'list.txt')
 with open(lst, 'w') as f:
-    for c in (hook, prob, demo, how, nums, timing, close):
+    for c in (hook, demo, alexa, how, nums, timing, close):
         f.write(f"file '{c}'\n")
 out = os.path.join(V, 'voice_shield_demo.mp4')
 run('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', lst, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-r', '30',
     '-c:a', 'aac', '-ar', str(SR), '-ac', '2', '-movflags', '+faststart', out)
-print(f'{out}  {dur(out):.1f}s  (hook {dur(hook):.0f}, problem {dur(prob):.0f}, demo {dur(demo):.0f}, how {dur(how):.0f}, numbers {dur(nums):.0f}, timing {dur(timing):.0f}, close {dur(close):.0f})')
+print(f'{out}  {dur(out):.1f}s  (hook {dur(hook):.0f}, demo {dur(demo):.0f}, alexa {dur(alexa):.0f}, how {dur(how):.0f}, numbers {dur(nums):.0f}, timing {dur(timing):.0f}, close {dur(close):.0f})')
