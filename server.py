@@ -5,6 +5,7 @@
   .venv/bin/python server.py --source file:x.wav   # replay a clip
 """
 import argparse
+import json
 import os
 import time
 from pathlib import Path
@@ -103,6 +104,35 @@ def verify_with_family(claimed_person: str, reason: str = 'the caller is asking 
     v = verify.verify(claimed_person, reason)
     shield.set_family(v['answer'])
     return v
+
+
+DATA = Path(__file__).parent / 'data'
+ROUTES = json.loads((DATA / 'trusted_routes.json').read_text())   # from Digi Sanrakshak (MIT), authority-sourced
+ACTION_TEXT = json.loads((DATA / 'action_text.json').read_text())
+
+
+class Advice(TypedDict):
+    tactic: str
+    steps: list[str]
+    say: str
+
+
+@mcp.tool(annotations=READ_ONLY, structured_output=True)
+def what_should_i_do(money_sent: bool = False, shared_otp_or_pin: bool = False, language: str = 'en') -> Advice:
+    """What to do right now about the current suspicious call, in order. Steps are fixed text from RBI / I4C (1930,
+    cybercrime.gov.in) guidance, not generated. Set money_sent or shared_otp_or_pin if the user already did that.
+    language: 'en' or 'hi'."""
+    lang = 'hi' if language.startswith('hi') else 'en'
+    status, _ = shield.snapshot()
+    tactic = 'family_emergency' if status.get('family') == 'no' else ((status.get('words') or {}).get('tactic') or 'default')
+    routes, T = ROUTES.get(lang, ROUTES['en']), ACTION_TEXT[lang]
+    if money_sent:
+        steps = T['money']
+    elif shared_otp_or_pin:
+        steps = T['creds'] + [routes.get(tactic, routes['default'])]
+    else:
+        steps = [routes.get(tactic, routes['default'])] + T['do_not'][1:3]
+    return {'tactic': tactic, 'steps': steps, 'say': ' '.join(steps[:2])}
 
 
 @mcp.tool()

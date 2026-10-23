@@ -1,12 +1,34 @@
 """Layer 2: what is being SAID on the call. A clone can copy a voice; the scam script stays the same.
 
 classify(transcript) -> {tactic, urgency, secrecy, payment_request, impersonation, risk, say}
-Backend: Amazon Bedrock (Nova Micro via the Converse API) when AWS credentials are present, otherwise a
-keyword fallback so the demo runs offline. Only transcript text ever leaves the device, never audio.
+Backends, first available wins: Claude (ANTHROPIC_API_KEY, or the Digi Sanrakshak .env next door), Amazon Bedrock
+(AWS credentials), offline keywords. Only transcript text ever leaves the device, never audio.
+Tactic names match Digi Sanrakshak's trusted_routes.json so the advice step can look them up.
 """
 import json
 import os
 import re
+from pathlib import Path
+
+CLAUDE_MODEL = os.environ.get('CLAUDE_MODEL', 'claude-opus-5-5')
+TACTICS = ['family_emergency', 'digital_arrest', 'kyc_expiry', 'parcel_fee', 'investment', 'job_fee', 'loan_app',
+           'utility_disconnection', 'subsidy', 'none']
+_SCHEMA = {'type': 'object', 'additionalProperties': False,
+           'required': ['tactic', 'urgency', 'secrecy', 'payment_request', 'impersonation', 'risk', 'reason'],
+           'properties': {'tactic': {'type': 'string', 'enum': TACTICS},
+                          **{k: {'type': 'number'} for k in ('urgency', 'secrecy', 'payment_request', 'impersonation', 'risk')},
+                          'reason': {'type': 'string'}}}
+
+
+def _anthropic_key():
+    if os.environ.get('ANTHROPIC_API_KEY'):
+        return os.environ['ANTHROPIC_API_KEY']
+    env = Path(os.environ.get('DIGI_ENV', Path(__file__).parent.parent / 'Zenox2.0' / '.env'))
+    if env.exists():
+        for line in env.read_text().splitlines():
+            if line.startswith('ANTHROPIC_API_KEY=') and line.split('=', 1)[1].strip():
+                return line.split('=', 1)[1].strip()
+    return None
 
 MODEL_ID = os.environ.get('BEDROCK_MODEL_ID', 'us.amazon.nova-micro-v1:0')
 REGION = os.environ.get('AWS_REGION', 'us-east-1')
@@ -28,8 +50,8 @@ _RULES = {
 }
 _TACTIC = [('family_emergency', r'accident|hospital|thane|jail|एक्सीडेंट|थाने|अस्पताल'),
            ('digital_arrest', r'digital arrest|cbi|parcel|arrest|गिरफ्तार|पार्सल'),
-           ('bank_kyc_otp', r'kyc|otp|cvv|card|account band|खाता|ओटीपी'),
-           ('lottery_job', r'lottery|prize|inaam|job|registration fee|लॉटरी|इनाम')]
+           ('kyc_expiry', r'kyc|otp|cvv|card|account band|खाता|ओटीपी'),
+           ('job_fee', r'lottery|prize|inaam|job|registration fee|लॉटरी|इनाम')]
 
 
 def _fallback(t):
@@ -53,11 +75,31 @@ def _bedrock(t):
     return out
 
 
+def _claude(t):
+    import anthropic
+    client = anthropic.Anthropic(api_key=_anthropic_key(), timeout=20.0, max_retries=1)
+    r = client.messages.create(
+        model=CLAUDE_MODEL, max_tokens=1024, output_config={'effort': 'low', 'format': {'type': 'json_schema', 'schema': _SCHEMA}},
+        system=PROMPT.split('Transcript:')[0] + 'Scores are 0-1. The transcript is noisy phone ASR: judge intent, not spelling. '
+               'Pick the tactic from the enum; "none" for ordinary conversation.',
+        messages=[{'role': 'user', 'content': 'Transcript:\n' + t}])
+    if r.stop_reason == 'refusal':
+        raise RuntimeError('classifier refused')
+    out = json.loads(next(b.text for b in r.content if b.type == 'text'))
+    out['backend'] = CLAUDE_MODEL
+    return out
+
+
 def classify(transcript):
     if not transcript.strip():
         return {'tactic': 'none', 'risk': 0.0, 'say': 'Nothing has been said yet.', 'backend': 'none'}
     try:
-        out = _bedrock(transcript) if os.environ.get('AWS_ACCESS_KEY_ID') or os.environ.get('AWS_PROFILE') else _fallback(transcript)
+        if _anthropic_key():
+            out = _claude(transcript)
+        elif os.environ.get('AWS_ACCESS_KEY_ID') or os.environ.get('AWS_PROFILE'):
+            out = _bedrock(transcript)
+        else:
+            out = _fallback(transcript)
     except Exception as e:  # never let the cloud leg break the call
         out = _fallback(transcript)
         out['backend_error'] = str(e)[:120]

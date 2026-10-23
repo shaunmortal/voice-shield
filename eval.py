@@ -28,6 +28,8 @@ CONDITIONS = {
     'band': ['-af', 'highpass=f=300,lowpass=f=3400', '-ar', '16000', '-ac', '1'],
     'g711': None,   # built in two passes below
     'opus_nb': None,
+    'opus_wb': None,  # WhatsApp-like: Opus 16 kHz VoIP 24 kb/s, the main delivery path of Indian clone scams
+    'ilbc': None,     # 8 kHz VoIP/SIM-box style codec (AMR-NB encoder is not in brew ffmpeg)
 }
 
 
@@ -39,12 +41,22 @@ def convert(src, dst, cond):
     if cond in ('clean', 'band'):
         subprocess.run(base + CONDITIONS[cond] + [dst], check=True)
         return
+    if cond == 'opus_wb':
+        mid = dst + '.ogg'
+        subprocess.run(base + ['-ar', '16000', '-ac', '1', '-c:a', 'libopus', '-b:a', '24k', '-application', 'voip', mid], check=True)
+        subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', mid, '-ar', '16000', '-ac', '1', dst], check=True)
+        os.remove(mid)
+        return
     band = dst + '.band.wav'
     subprocess.run(base + ['-af', 'highpass=f=300,lowpass=f=3400', '-ar', '8000', '-ac', '1', band], check=True)
     if cond == 'g711':
         mid = dst + '.ul'
         subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', band, '-c:a', 'pcm_mulaw', '-f', 'mulaw', mid], check=True)
         subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-f', 'mulaw', '-ar', '8000', '-ac', '1', '-i', mid, '-ar', '16000', dst], check=True)
+    elif cond == 'ilbc':
+        mid = dst + '.caf'
+        subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', band, '-c:a', 'ilbc_at', mid], check=True)
+        subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', mid, '-ar', '16000', '-ac', '1', dst], check=True)
     elif cond == 'opus_nb':
         mid = dst + '.ogg'
         subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', band, '-c:a', 'libopus', '-b:a', '12k', '-application', 'voip', mid], check=True)
