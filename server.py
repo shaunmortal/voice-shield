@@ -99,7 +99,7 @@ class Verification(TypedDict):
 def verify_with_family(claimed_person: str, reason: str = 'the caller is asking for money urgently') -> Verification:
     """Ask the REAL family member, on their own phone, whether they are the one calling right now.
     Use when the caller claims to be a relative and asks for money, an OTP, or secrecy, whatever the voice score says.
-    Waits up to 25 seconds for their answer."""
+    Waits up to 45 seconds for their answer."""
     v = verify.verify(claimed_person, reason)
     shield.set_family(v['answer'])
     return v

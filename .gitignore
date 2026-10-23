@@ -10,3 +10,9 @@ data/eval/
 data/calltest/
 .env
 .DS_Store
+video/build/
+video/*.mp4
+video/*.png
+video/*.json
+video/*.txt
+video/*.log

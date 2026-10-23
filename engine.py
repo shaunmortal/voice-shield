@@ -183,7 +183,9 @@ class Shield:
                 st['updated'] = time.time()
                 if p is None:
                     continue
-                st['audio_level'] = self.risk.update(p)
+                # once a call has sounded synthetic it stays 'unverified' until the family answers
+                RANK = ('listening', 'safe', 'suspicious', 'alert')
+                st['audio_level'] = max(st['audio_level'], self.risk.update(p), key=RANK.index)
                 st['risk'] = round(self.risk.ema, 3)
                 st['stage2'] = None if s2 is None else round(s2, 3)
                 st['speech_seconds'] += HOP_S
