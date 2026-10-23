@@ -28,10 +28,10 @@ try:
     tools = sorted(t['name'] for t in rpc('tools/list', id=2, headers=h)['tools'])
     assert tools == ['get_alert_history', 'get_call_status', 'reset_call', 'verify_with_family', 'what_should_i_do'], tools
     levels = []
-    for i in range(20):
+    for i in range(45):
         levels.append(rpc('tools/call', {'name': 'get_call_status', 'arguments': {}}, id=10 + i, headers=h)['structuredContent']['level'])
         if levels[-1] == 'alert': break
-        if i == 19: print(rpc('tools/call', {'name': 'get_call_status', 'arguments': {}}, id=98, headers=h)['structuredContent'])
+        if i == 44: print(rpc('tools/call', {'name': 'get_call_status', 'arguments': {}}, id=98, headers=h)['structuredContent'])
         time.sleep(1)
     assert levels[-1] == 'alert', levels
     hist = rpc('tools/call', {'name': 'get_alert_history', 'arguments': {}}, id=99, headers=h)['structuredContent']

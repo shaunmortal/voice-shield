@@ -129,8 +129,18 @@ class Words:
         finally:
             self.busy = False
 
-    def update(self, buf, now):
-        """Start a transcription if one is due; the result arrives later through on_result."""
+    def update(self, buf, now, final=False):
+        """Start a transcription if one is due; the result arrives later through on_result.
+        final=True (stream ended) transcribes what is left synchronously so short calls still get a verdict."""
+        if final:
+            while self.busy:
+                time.sleep(0.1)
+            if dbfs(buf) >= SPEECH_DBFS:
+                self.busy = True
+                self._work(buf.copy())
+            return
+        if len(buf) < 4 * SR:
+            return
         if not self.busy and now - self.last >= WORDS_EVERY_S and dbfs(buf) >= SPEECH_DBFS:
             self.last, self.busy = now, True
             threading.Thread(target=self._work, args=(buf.copy(),), daemon=True).start()
@@ -190,6 +200,8 @@ class Shield:
                 st['stage2'] = None if s2 is None else round(s2, 3)
                 st['speech_seconds'] += HOP_S
                 self._refuse()
+        if self.words:
+            self.words.update(buf, time.time(), final=True)
 
     def _refuse(self):
         """Recompute the fused level; caller holds the lock."""

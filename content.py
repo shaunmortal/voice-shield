@@ -90,12 +90,21 @@ def _claude(t):
     return out
 
 
+_claude_dead = False  # set after an auth/billing failure so every call doesn't pay for a doomed request
+
+
 def classify(transcript):
+    global _claude_dead
     if not transcript.strip():
         return {'tactic': 'none', 'risk': 0.0, 'say': 'Nothing has been said yet.', 'backend': 'none'}
     try:
-        if _anthropic_key():
-            out = _claude(transcript)
+        if _anthropic_key() and not _claude_dead:
+            try:
+                out = _claude(transcript)
+            except Exception as e:
+                if 'credit balance' in str(e) or 'authentication' in str(e).lower():
+                    _claude_dead = True
+                raise
         elif os.environ.get('AWS_ACCESS_KEY_ID') or os.environ.get('AWS_PROFILE'):
             out = _bedrock(transcript)
         else:

@@ -35,6 +35,7 @@ A scammer clones your voice from a 10-second Instagram clip, calls your father a
 |---|---|---|
 | `get_call_status()` | `level` (listening/safe/suspicious/alert), calibrated `risk`, `say` | "Alexa, is this call real?" |
 | `verify_with_family(claimed_person, reason)` | `answer` yes/no/no_answer + `say` | "Alexa, ask Rohan if it's him" → button on Rohan's phone |
+| `what_should_i_do(money_sent, shared_otp_or_pin, language)` | ordered steps, fixed authority text (en/hi) | "Alexa, maine paise bhej diye, ab kya karun?" |
 | `get_alert_history(limit)` | recent alerts | "Alexa, were there scam calls this week?" |
 | `reset_call()` | — | call ended |
 
@@ -71,10 +72,13 @@ Test set: one consenting team member's voice (bona fide, 4 recordings, 512 four-
 | Band-limited 300–3400 Hz | 0.8 % | 90 % | — |
 | G.711 µ-law (landline) | 1.2 % | 90 % | 0 / 4 |
 | Opus narrowband 12 kb/s | **8.9 %** | 80 % | **3 / 4** |
-| **Real VoLTE call** (laptop speaker → friend's phone → Jio/Airtel network → our Oppo, captured by scrcpy) | **≈ 35–40 %** | 0 % | 2 / 3 (audio alone) |
+| **Opus wideband 24 kb/s (WhatsApp-style VoIP, the main delivery path of Indian clone scams)** | **0.0 %** | **100 %** | — |
+| iLBC 8 kHz (VoIP / SIM-box style) | 10.1 % | 80 % | — |
+| Loudspeaker replay into a real VoLTE call (laptop speaker → friend's phone mic → network → our Oppo, scrcpy) — **worst case** | **≈ 35–40 %** | 0 % | 2 / 3 (audio alone) |
 
 Read these honestly:
-- **On simulated codecs the detector works; on a real phone call it does not.** Played over the air into a real call, clone scores fell from 0.95 to ≈0.45 and real speech rose to ≈0.30, so the two overlap. This matches the literature (SAFE 2025: over-the-air re-recording is the most damaging condition) and it is the most important number in this README.
+- **Digital paths: the detector works. Loudspeaker replay: it does not.** Indian voice-clone scams arrive mostly as WhatsApp calls or VoIP pushed through SIM boxes, i.e. audio injected digitally (see `reports/Real call clone detection fixes.md`); on a WhatsApp-style Opus channel every clone was caught at 1 % false alarms. When we instead played clones from a laptop speaker into a second phone (a replay path no scam report describes), clone scores fell from 0.95 to ≈0.45 and real speech rose to ≈0.30. That matches the literature (ReplayDF, EchoFake: over-the-air replay is the most damaging condition) and is why we report it as the worst case, not hide it.
+- Methodology caveat we found ourselves: in that replay test the "real" class was also a recording played from the speaker, i.e. itself a replay. A live speaker vs injected clone test is the next measurement.
 - So the design does not trust audio: **the voice layer alone can only raise "suspicious" ("verify this caller"), never "alert".** An alert needs scam language in the live transcript (Whisper on-device → scam classifier) or a ❌ from the real family member. Both of those work identically on a bad phone line, because a clone can copy a voice but not the script it must say or the button on the real son's phone.
 - Two clone families are *seen* only in the sense that we chose the calibration on them; the model was not trained on them. Published results for unseen 2024-era generators are 25–33 % EER and 40–50 % on multilingual in-the-wild sets that include Hindi ([Deepfake-Eval-2024](https://arxiv.org/abs/2503.02857), [ML-ITW](https://arxiv.org/abs/2603.05852)). Real-time voice conversion (RVC/Seed-VC) was not tested.
 - Model swap evidence: NII AntiDeepfake-Small (ported without fairseq in `antideepfake.py`) scored our own voice 0.00 but **missed** the F5 clones (0.02–0.47); DF_Arena_500M caught them all, so it is the live model.
@@ -88,6 +92,10 @@ Audio is processed on the laptop and discarded after each window; only aggregate
 ## What was built during the hackathon
 
 Everything in this repository (21–23 Oct 2026). The idea descends from our SIH 2026 problem-statement design (voice-clone detection on cellular calls), of which no code survived; the capture path, detector evaluation, MCP server, Alexa+ client, Telegram verification and scam-language layer are new.
+
+## Built on Digi Sanrakshak
+
+`data/trusted_routes.json` and `data/action_text.json` (the authority-sourced "what to do now" steps behind `what_should_i_do`, in English and Hindi) and the scam-tactic taxonomy come from our team's earlier MIT-licensed project [Digi Sanrakshak](https://github.com/harsh-1-code/Sanrakshak_AI). Those strings are deliberately not generated: they follow RBI, I4C (1930) and cybercrime.gov.in guidance.
 
 ## Licenses
 
