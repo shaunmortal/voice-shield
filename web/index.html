@@ -23,6 +23,8 @@
   button { background:#1a212b; color:var(--fg); border:1px solid #2a3442; border-radius:999px; padding:10px 18px; font:inherit; cursor:pointer; }
   button:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
   button.ask { background:var(--ring); color:#0b0f14; border-color:transparent; font-weight:600; }
+  input { background:#1a212b; color:var(--fg); border:1px solid #2a3442; border-radius:999px; padding:10px 18px; font:inherit; width:min(420px, 90vw); }
+  .tool { color:#ffb020; font-family:ui-monospace, monospace; font-size:12px; }
   small { color:var(--dim); }
   .log { width:min(640px, 100%); background:var(--card); border:1px solid #1f2833; border-radius:14px; padding:14px 16px;
          max-height:40vh; overflow:auto; font-size:14px; }
@@ -37,6 +39,10 @@
   <div class="meter" aria-label="AI voice risk"><i id="bar"></i></div>
   <small id="meta">connecting…</small>
   <small id="timing"></small>
+  <div class="row">
+    <button class="ask" id="talk">🎙️ "Alexa…" (hold to speak)</button>
+    <input id="say_text" placeholder="…or type: Alexa, ye call asli hai kya?" aria-label="Ask Alexa" />
+  </div>
   <div class="row">
     <button id="voice">🔊 Enable Alexa voice</button>
     <button class="ask" id="askStatus">"Alexa, is this call real?"</button>
@@ -127,6 +133,27 @@
     const v = await call('verify_with_family', { claimed_person: 'Rohan', reason: 'voice looks AI-generated and the caller is asking for money' });
     log('a', 'Alexa: ' + v.say); speak(v.say, 'en-IN');
   };
+  // ---- talk to the Alexa+ stand-in: Claude agent that uses this MCP server's tools (server-side, see assistant.py)
+  async function ask(text) {
+    if (!text.trim()) return;
+    log('u', 'You: "' + text + '"'); mark('user', text);
+    log('t', 'Alexa+ (Claude) is choosing MCP tools…');
+    const out = await (await fetch('/api/assistant', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                      body: JSON.stringify({ text }) })).json();
+    for (const t of out.tools) log('tool', `tools/call ${t.name}(${JSON.stringify(t.input)})`);
+    log('a', 'Alexa: ' + out.reply);
+    speak(out.reply, /[a-z]/i.test(out.reply) && !/ (hai|kijiye|mat|aap|kar)/.test(out.reply) ? 'en-IN' : 'hi-IN');
+    tick();
+  }
+  say_text.onkeydown = (e) => { if (e.key === 'Enter') { ask(say_text.value); say_text.value = ''; } };
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SR) {
+    const rec = new SR(); rec.lang = 'hi-IN'; rec.interimResults = false;
+    rec.onresult = (e) => ask(e.results[0][0].transcript);
+    talk.onmousedown = () => { voiceOn = true; rec.start(); talk.textContent = '🎙️ listening…'; };
+    talk.onmouseup = () => { rec.stop(); talk.textContent = '🎙️ "Alexa…" (hold to speak)'; };
+  } else { talk.disabled = true; talk.textContent = 'Speech input needs Chrome'; }
+
   reset.onclick = async () => { await call('reset_call'); last = 'listening'; tick(); };
 
   connect().then(() => { setInterval(tick, 1000); tick(); }).catch(e => log('t', 'connect failed: ' + e.message));

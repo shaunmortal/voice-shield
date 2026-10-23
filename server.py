@@ -175,6 +175,17 @@ async def api_event(request):
     return JSONResponse(EVENTS)
 
 
+@mcp.custom_route('/api/assistant', methods=['POST'])
+async def api_assistant(request):
+    """Alexa+ stand-in: Claude agent that uses this server's tools over MCP (see assistant.py)."""
+    import assistant
+    text = (await request.json()).get('text', '')
+    port = request.url.port or 8000
+    out = await assistant.answer(text, mcp_url=f'http://127.0.0.1:{port}/mcp')
+    EVENTS.append({'t': time.time(), 'name': 'assistant', 'text': text, 'reply': out['reply'], 'tools': [t['name'] for t in out['tools']]})
+    return JSONResponse(out)
+
+
 @mcp.custom_route('/api/reset', methods=['POST'])
 async def api_reset(_):
     return JSONResponse({'ok': reset_call()})
