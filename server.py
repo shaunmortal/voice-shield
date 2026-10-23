@@ -19,6 +19,7 @@ from starlette.responses import FileResponse, JSONResponse
 
 from engine import Shield
 import verify
+from payguard import PayGuard
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True)
 
@@ -44,6 +45,7 @@ class CallStatus(TypedDict):
     timing: Timing | None  # who-speaks-when: caller reply gaps and backchannels
     speech_seconds: float
     audio_live: bool
+    payment: str | None  # Payment Guard: UPI app opened during/after the call -> family answer (asking|yes|no|no_answer)
     say: str  # a sentence the assistant can speak as-is
 
 
@@ -60,6 +62,7 @@ mcp = MCPServer(
                  'caller another way before sending money.',
 )
 shield: Shield | None = None
+guard: PayGuard | None = None
 
 SAY = {
     'listening': 'I am listening to the call, but I have not heard enough speech yet.',
@@ -86,8 +89,12 @@ def get_call_status() -> CallStatus:
         say = 'Your family member confirmed it is them.'
     if w and w.get('risk', 0) >= 0.6:
         say = w['say'] + ' ' + say
+    pay = guard.state if guard else None
+    if pay and pay['family'] in ('asking', 'no_answer'):
+        say = f"Wait: {pay['app']} was just opened during this call. I have asked your family member to confirm first. " + say
     return {'level': level, 'audio_level': status['audio_level'], 'risk': status['risk'], 'speech_seconds': status['speech_seconds'],
             'audio_live': not stale, 'say': say,
+            'payment': None if not pay else f"{pay['app']} opened; family: {pay['family']}",
             'words': None if not w else {'transcript': w['transcript'], 'tactic': w['tactic'], 'risk': w['risk']},
             'timing': None if not status.get('timing') else {k: status['timing'][k] for k in ('replies', 'median_gap_s', 'backchannels', 'bot_like')}}
 
@@ -148,6 +155,8 @@ def what_should_i_do(money_sent: bool = False, shared_otp_or_pin: bool = False, 
 def reset_call() -> str:
     """Clear the live risk when a call ends, so the next call starts fresh. Alert history is kept."""
     shield.clear()
+    if guard:
+        guard.reset()
     return 'Ready for the next call.'
 
 
@@ -211,6 +220,8 @@ if __name__ == '__main__':
     ap.add_argument('--port', type=int, default=int(os.environ.get('PORT', 8000)))
     args = ap.parse_args()
     shield = Shield(args.source, timing=args.source in ('whatsapp', 'phone') or os.environ.get('TIMING') == '1').start()
+    if args.source in ('phone', 'whatsapp') or os.environ.get('PAYGUARD') == '1':
+        guard = PayGuard(shield).start()
     # PUBLIC_HOST: the tunnel hostname Alexa+ reaches us on (e.g. abc.trycloudflare.com)
     hosts = ['127.0.0.1:*', 'localhost:*'] + [h for h in [os.environ.get('PUBLIC_HOST')] if h]
     app = mcp.streamable_http_app(
