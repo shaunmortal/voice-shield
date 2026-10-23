@@ -9,7 +9,7 @@ An Alexa+ MCP add-on that checks live phone and WhatsApp calls, asks the real fa
 
 **Amazon Developer Hackathon 2026 · Alexa+ track · Open Source**
 
-[![Demo video](https://img.shields.io/badge/▶%20Demo%20video-2%3A53-FF0000?logo=youtube&logoColor=white)](https://youtu.be/Lkfjvd8oUys)
+[![Demo video](https://img.shields.io/badge/▶%20Demo%20video-2%3A52-FF0000?logo=youtube&logoColor=white)](https://youtu.be/Cp8WuCeaHMY)
 [![MCP](https://img.shields.io/badge/MCP-2025--11--25%20·%20Streamable%20HTTP-5A45FF)](server.py)
 [![Latency](https://img.shields.io/badge/round--trip-1--3%20ms%20(limit%20500%20ms)-2ea44f)](#-ready-for-the-alexa-mcp-toolkit)
 [![Android](https://img.shields.io/badge/Android-real%20SIM%20%2B%20WhatsApp%20calls,%20no%20root-3DDC84?logo=android&logoColor=white)](#-live-sim-call-capture-android-no-root)
