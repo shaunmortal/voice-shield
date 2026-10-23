@@ -63,9 +63,9 @@ class Turns:
         g = np.array(self.gaps)
         median = float(np.median(g)) if len(g) else None
         # ponytail: hand-set thresholds from published human vs voice-agent medians; refit on recorded calls
-        bot_like = len(g) >= 3 and median > 1.0 and self.backchannels == 0
-        return {'replies': len(g), 'median_gap_s': None if median is None else round(median, 2),
-                'gaps_s': [round(x, 2) for x in g[-8:]], 'backchannels': self.backchannels,
+        bot_like = bool(len(g) >= 3 and median > 1.0 and self.backchannels == 0)
+        return {'replies': len(g), 'median_gap_s': None if median is None else round(float(median), 2),
+                'gaps_s': [round(float(x), 2) for x in g[-8:]], 'backchannels': self.backchannels,
                 'user_turns': self.user_turns, 'bot_like': bot_like}
 
 

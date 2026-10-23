@@ -36,6 +36,7 @@
   <p id="say"></p>
   <div class="meter" aria-label="AI voice risk"><i id="bar"></i></div>
   <small id="meta">connecting…</small>
+  <small id="timing"></small>
   <div class="row">
     <button id="voice">🔊 Enable Alexa voice</button>
     <button class="ask" id="askStatus">"Alexa, is this call real?"</button>
@@ -95,6 +96,9 @@
     bar.style.width = Math.round(s.risk * 100) + '%';
     const w = s.words;
     meta.textContent = `voice ${Math.round(s.risk * 100)}% · words ${w ? Math.round(w.risk * 100) + '% ' + w.tactic.replace('_', ' ') : '–'} · ${s.speech_seconds}s analysed · ${s.audio_live ? 'live audio' : 'no audio'}`;
+    const tm = s.timing;
+    timing.textContent = tm ? `caller reply gap: ${tm.median_gap_s ?? '–'} s (humans ≈ 0.2 s) · "haan/hmm" while you talk: ${tm.backchannels} · replies: ${tm.replies}${tm.bot_like ? ' · ⚠️ bot-like timing' : ''}` : '';
+    timing.style.color = tm && tm.bot_like ? 'var(--ring)' : '';
     if (w && w.transcript && w.transcript !== lastTx) { lastTx = w.transcript; log('t', 'heard: ' + w.transcript); }
     if (s.level !== last) mark('level', s.level);
     if (s.level !== last && SPEAK[s.level]) speak(SPEAK[s.level]);

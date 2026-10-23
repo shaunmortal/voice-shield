@@ -31,10 +31,36 @@ SPEECH_DBFS = -45    # below this RMS the window is treated as silence
 MODEL = 'Speech-Arena-2025/DF_Arena_500M_V_1'
 
 
+def ff_pcm(ff_in, chunk_s):
+    """Generic ffmpeg -> 16 kHz mono float32 chunk generator."""
+    ff = subprocess.Popen(['ffmpeg', '-loglevel', 'error', *ff_in, '-f', 's16le', '-ac', '1', '-ar', str(SR), '-'],
+                          stdout=subprocess.PIPE)
+    n = int(SR * chunk_s) * 2
+    try:
+        while chunk := ff.stdout.read(n):
+            yield np.frombuffer(chunk, np.int16).astype(np.float32) / 32768
+    finally:
+        ff.terminate()
+
+
+def scrcpy_fifo(audio_source):
+    """Start scrcpy recording `audio_source` into a named pipe; returns (ffmpeg input args, process)."""
+    fifo = os.path.join(tempfile.mkdtemp(), 'call.wav')
+    os.mkfifo(fifo)
+    extra = ['--audio-dup'] if audio_source == 'playback' else []  # keep the call audible on the phone
+    p = subprocess.Popen(['scrcpy', '--no-video', '--no-window', '--no-playback', f'--audio-source={audio_source}', *extra,
+                          '--audio-codec=raw', '--record-format=wav', f'--record={fifo}'],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return ['-i', fifo], p
+
+
 def pcm_stream(source):
     """Yield float32 chunks of HOP_S seconds from the chosen source."""
     procs = []
-    if source == 'phone':
+    if source == 'whatsapp':  # VoIP call: remote party's audio digitally via Android playback capture
+        ff_in, p = scrcpy_fifo('playback')
+        procs.append(p)
+    elif source == 'phone':
         fifo = os.path.join(tempfile.mkdtemp(), 'call.wav')
         os.mkfifo(fifo)
         procs.append(subprocess.Popen(
@@ -146,7 +172,7 @@ class Words:
             threading.Thread(target=self._work, args=(buf.copy(),), daemon=True).start()
 
 
-def fuse(audio_level, words, family=None):
+def fuse(audio_level, words, family=None, bot_like=False):
     """Audio boosts, words gate, humans decide: audio alone never goes past 'suspicious'.
     family: answer from verify_with_family ('yes' | 'no' | None) overrides everything."""
     if family == 'no':
@@ -154,18 +180,46 @@ def fuse(audio_level, words, family=None):
     if family == 'yes':
         return 'safe'
     w = (words or {}).get('risk', 0.0)
-    if w >= 0.6 or (w >= 0.3 and audio_level == 'alert'):
+    machine = audio_level == 'alert' or bot_like  # synthetic-sounding voice, or bot-like turn-taking
+    if w >= 0.6 or (w >= 0.3 and machine) or (bot_like and audio_level in ('suspicious', 'alert')):
         return 'alert'
-    if audio_level in ('alert', 'suspicious') or w >= 0.3:
+    if audio_level in ('alert', 'suspicious') or w >= 0.3 or bot_like:
         return 'suspicious'
     return audio_level
+
+
+class Timing:
+    """Layer 4 live: the caller's audio (same stream the detector reads) + the user's voice from the laptop mic,
+    paired frame by frame into turns.Turns. The mic is read on its own thread into a queue."""
+
+    def __init__(self):
+        import queue
+        import turns
+        self.turns, self.fs = turns.Turns(), turns.FRAME_S
+        self.q = queue.Queue()
+
+    def start(self):
+        def mic():
+            for frame in ff_pcm(['-f', 'avfoundation', '-i', ':default'], self.fs):
+                self.q.put(frame)
+        threading.Thread(target=mic, daemon=True).start()
+        return self
+
+    def feed(self, caller_chunk):
+        n = int(SR * self.fs)
+        for k in range(len(caller_chunk) // n):
+            self.turns.push(self.q.get(), caller_chunk[k * n:(k + 1) * n])
+
+    def summary(self):
+        return self.turns.summary()
 
 
 class Shield:
     """Runs the pipeline on a background thread and exposes a status snapshot."""
 
-    def __init__(self, source, detector=None, words=True):
+    def __init__(self, source, detector=None, words=True, timing=False):
         self.source = source
+        self.timing = Timing().start() if timing else None
         self.detector = detector or Detector()
         self.words = Words(self._on_words) if words else None
         self.lock = threading.Lock()
@@ -184,6 +238,8 @@ class Shield:
     def run(self):
         buf = np.zeros(0, np.float32)
         for chunk in pcm_stream(self.source):
+            if self.timing:
+                self.timing.feed(chunk)
             buf = np.concatenate([buf, chunk])[-int(SR * WORDS_WIN_S):]
             p, s2 = self.detector.score(buf[-int(SR * WIN_S):], buf[-int(SR * CONFIRM_WIN_S):])
             if self.words:
@@ -207,7 +263,8 @@ class Shield:
         """Recompute the fused level; caller holds the lock."""
         st = self.status
         prev = st['level']
-        st['level'] = fuse(st['audio_level'], st['words'], st['family'])
+        bot_like = bool(self.timing and self.timing.summary()['bot_like'])
+        st['level'] = fuse(st['audio_level'], st['words'], st['family'], bot_like)
         if st['level'] == 'alert' and prev != 'alert':
             self.events.append({'at': time.time(), 'risk': st['risk'], 'source': self.source,
                                 'tactic': 'family_denied' if st['family'] == 'no' else (st['words'] or {}).get('tactic')})
@@ -225,7 +282,9 @@ class Shield:
 
     def snapshot(self):
         with self.lock:
-            return dict(self.status), list(self.events)
+            st = dict(self.status)
+            st['timing'] = self.timing.summary() if self.timing else None
+            return st, list(self.events)
 
     def clear(self):
         with self.lock:
