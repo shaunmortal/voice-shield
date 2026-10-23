@@ -46,3 +46,22 @@ Format per entry: task · steps · expected vs actual · severity · workaround 
 ## 8. Phone-call capture
 - `scrcpy --audio-source=voice-call` on Oppo F25 Pro (ColorOS 16 / Android 16) returns both sides of a VoLTE call as a mixed mono stream (left=right); earlier Android/OEM builds return silence. Developer options needed "Disable permission monitoring" and USB mode "File transfer". macOS has no `timeout` binary; use `--time-limit`.
 - Whisper transcription of a quiet Hindi/Hinglish reference clip hallucinated until the clip was amplified; `language=None` (auto) gave the correct English transcript where `language='hi'` produced garbage Devanagari.
+
+## 9. Android playback capture mutes the call (scrcpy)
+- **Task:** capture the remote side of a WhatsApp call digitally (no loudspeaker). **Steps:** `scrcpy --audio-source=playback`.
+- **Expected:** a copy of the call audio. **Actual:** it worked, but the call went silent on the phone, so the user thought the call had dropped; `voice-call*` sources return silence for VoIP calls; starting the capture before any audio plays crashes scrcpy (exit 139).
+- **Severity:** high (looked like a broken call). **Workaround:** `--audio-dup`; start capture only once the call is connected.
+- **Suggestion (for Alexa/Echo + phone integrations):** a documented, consented "call companion" audio API on Android/Fire OS would remove this whole class of hacks.
+
+## 10. Codec simulation is not channel simulation
+- **Task:** estimate detector accuracy on WhatsApp calls. **Steps:** ffmpeg Opus 24 kb/s round-trip → EER 0 %. Then a real WhatsApp call with a consenting friend → ≈59 % EER (live human scored more synthetic than his clone).
+- **Expected:** the codec drives the degradation. **Actual:** WhatsApp's noise suppression / AGC does; we had already seen loudness normalisation flip real speech to "synthetic".
+- **Severity:** critical for anyone shipping voice-deepfake detection. **Workaround:** audio alone may only say "verify"; alerts need words, timing or human confirmation.
+- **Suggestion:** benchmark suites (and Alexa+ safety guidance) should include real VoIP-app recordings, not only codec round-trips.
+
+## 11. Telegram inline buttons feel dead under polling
+- **Task:** "Are you calling right now? ✅/❌" for the family member. **Actual:** inline-keyboard taps spin until the bot answers the callback, so the user kept tapping and thought it was broken; one long-poll request hung and swallowed the answer.
+- **Severity:** medium. **Workaround:** reply keyboard (the tap becomes a visible chat message) + short polling with retry.
+
+## 12. MCP Python SDK 2.x field names
+- `mcp.Client.list_tools()` returns tools with `input_schema` (snake_case) and `call_tool` returns `structured_content` / `is_error`, while the JSON wire format and most docs say `inputSchema` / `structuredContent` / `isError`. **Severity:** low (one AttributeError). **Suggestion:** note the Pythonic field names in the migration guide.
